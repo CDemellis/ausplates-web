@@ -30,31 +30,32 @@ interface SearchParams {
   sort?: string;
 }
 
-export default async function BrowsePlatesPage({
-  searchParams,
-}: {
-  searchParams: Promise<SearchParams>;
+export default async function BrowsePlatesPage(props: {
+  searchParams?: Promise<SearchParams>;
 }) {
-  const params = await searchParams;
-  const selectedState = params.state?.toUpperCase() as AustralianState | undefined;
-  const selectedType = params.type as PlateType | undefined;
-  const sortBy = params.sort || 'recent';
+  // Safely await searchParams
+  const searchParams = props.searchParams ? await props.searchParams : {};
+  const selectedState = searchParams?.state?.toUpperCase() as AustralianState | undefined;
+  const selectedType = searchParams?.type as PlateType | undefined;
+  const sortBy = searchParams?.sort || 'recent';
 
   // Fetch listings from API
   let listings: Listing[] = [];
   let total = 0;
 
   try {
+    const sortParam = sortBy === 'price-low' ? 'price_asc' : sortBy === 'price-high' ? 'price_desc' : 'recent';
     const response = await getListings({
       state: selectedState,
       plateType: selectedType,
       pageSize: 24,
-      sort: sortBy === 'price-low' ? 'price_asc' : sortBy === 'price-high' ? 'price_desc' : 'recent',
+      sort: sortParam,
     });
-    listings = response.listings;
-    total = response.total;
-  } catch {
-    // API error - show empty state
+    listings = response?.listings || [];
+    total = response?.total || 0;
+  } catch (error) {
+    console.error('Failed to fetch listings:', error);
+    // Continue with empty listings
   }
 
   const buildFilterUrl = (key: string, value: string | undefined) => {
@@ -87,7 +88,7 @@ export default async function BrowsePlatesPage({
           {/* State Filter */}
           <div className="flex flex-wrap gap-2">
             <Link
-              href={buildFilterUrl('state', undefined)}
+              href="/plates"
               className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
                 !selectedState
                   ? 'bg-[var(--green)] text-white'
