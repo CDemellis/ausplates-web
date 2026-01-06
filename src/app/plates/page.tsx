@@ -1,11 +1,10 @@
 import { Metadata } from 'next';
 import Link from 'next/link';
-import { ListingCard, ListingCardSkeleton } from '@/components/ListingCard';
+import { ListingCard } from '@/components/ListingCard';
 import { getListings } from '@/lib/api';
 import {
   AustralianState,
   PlateType,
-  STATE_NAMES,
   PLATE_TYPE_NAMES,
   Listing,
 } from '@/types/listing';
@@ -21,130 +20,6 @@ export const metadata: Metadata = {
     url: 'https://ausplates.app/plates',
   },
 };
-
-// Mock listings for development
-const MOCK_LISTINGS: Listing[] = [
-  {
-    id: '1',
-    slug: 'boss-vic',
-    combination: 'BOSS',
-    state: 'VIC',
-    plateType: 'custom',
-    price: 4500000,
-    isOpenToOffers: true,
-    isFeatured: true,
-    status: 'active',
-    viewsCount: 234,
-    sellerId: '1',
-    createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: '2',
-    slug: 'crypto-nsw',
-    combination: 'CRYPTO',
-    state: 'NSW',
-    plateType: 'custom',
-    price: 8500000,
-    isOpenToOffers: false,
-    isFeatured: true,
-    status: 'active',
-    viewsCount: 567,
-    sellerId: '2',
-    createdAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: '3',
-    slug: '4eva-qld',
-    combination: '4EVA',
-    state: 'QLD',
-    plateType: 'custom',
-    price: 1200000,
-    isOpenToOffers: true,
-    isFeatured: false,
-    status: 'active',
-    viewsCount: 89,
-    sellerId: '3',
-    createdAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: '4',
-    slug: 'ceo-vic',
-    combination: 'CEO',
-    state: 'VIC',
-    plateType: 'custom',
-    price: 12000000,
-    isOpenToOffers: true,
-    isFeatured: true,
-    status: 'active',
-    viewsCount: 445,
-    sellerId: '4',
-    createdAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: '5',
-    slug: 'legend-nsw',
-    combination: 'LEGEND',
-    state: 'NSW',
-    plateType: 'custom',
-    price: 3500000,
-    isOpenToOffers: false,
-    isFeatured: false,
-    status: 'active',
-    viewsCount: 178,
-    sellerId: '5',
-    createdAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: '6',
-    slug: 'king-sa',
-    combination: 'KING',
-    state: 'SA',
-    plateType: 'custom',
-    price: 7500000,
-    isOpenToOffers: true,
-    isFeatured: false,
-    status: 'active',
-    viewsCount: 312,
-    sellerId: '6',
-    createdAt: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000).toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: '7',
-    slug: '123-vic',
-    combination: '123',
-    state: 'VIC',
-    plateType: 'numeric',
-    price: 25000000,
-    isOpenToOffers: true,
-    isFeatured: true,
-    status: 'active',
-    viewsCount: 892,
-    sellerId: '7',
-    createdAt: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: '8',
-    slug: 'amg-wa',
-    combination: 'AMG',
-    state: 'WA',
-    plateType: 'custom',
-    price: 4800000,
-    isOpenToOffers: false,
-    isFeatured: false,
-    status: 'active',
-    viewsCount: 201,
-    sellerId: '8',
-    createdAt: new Date(Date.now() - 6 * 24 * 60 * 60 * 1000).toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-];
 
 const STATES: AustralianState[] = ['VIC', 'NSW', 'QLD', 'SA', 'WA', 'TAS', 'NT', 'ACT'];
 const PLATE_TYPES: PlateType[] = ['custom', 'heritage', 'euro', 'numeric', 'slimline'];
@@ -165,42 +40,21 @@ export default async function BrowsePlatesPage({
   const selectedType = params.type as PlateType | undefined;
   const sortBy = params.sort || 'recent';
 
-  // Try to fetch real listings
+  // Fetch listings from API
   let listings: Listing[] = [];
+  let total = 0;
+
   try {
     const response = await getListings({
       state: selectedState,
       plateType: selectedType,
       pageSize: 24,
+      sort: sortBy === 'price-low' ? 'price_asc' : sortBy === 'price-high' ? 'price_desc' : 'recent',
     });
     listings = response.listings;
+    total = response.total;
   } catch {
-    listings = [];
-  }
-
-  // Fall back to mock if no results
-  if (listings.length === 0) {
-    listings = MOCK_LISTINGS;
-
-    // Apply client-side filtering to mock data
-    if (selectedState) {
-      listings = listings.filter((l) => l.state === selectedState);
-    }
-    if (selectedType) {
-      listings = listings.filter((l) => l.plateType === selectedType);
-    }
-  }
-
-  // Sort listings
-  if (sortBy === 'price-low') {
-    listings = [...listings].sort((a, b) => a.price - b.price);
-  } else if (sortBy === 'price-high') {
-    listings = [...listings].sort((a, b) => b.price - a.price);
-  } else {
-    // Default: most recent
-    listings = [...listings].sort(
-      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-    );
+    // API error - show empty state
   }
 
   const buildFilterUrl = (key: string, value: string | undefined) => {
@@ -222,7 +76,7 @@ export default async function BrowsePlatesPage({
             Browse Number Plates
           </h1>
           <p className="mt-2 text-[var(--text-secondary)]">
-            {listings.length} personalised plates for sale across Australia
+            {total > 0 ? `${total} personalised plates for sale across Australia` : 'Personalised plates for sale across Australia'}
           </p>
         </div>
       </div>
@@ -338,19 +192,21 @@ export default async function BrowsePlatesPage({
             </svg>
             <h3 className="text-lg font-medium text-[var(--text)] mb-2">No plates found</h3>
             <p className="text-[var(--text-muted)] mb-6">
-              Try adjusting your filters or browse all plates
+              {selectedState || selectedType ? 'Try adjusting your filters or browse all plates' : 'Be the first to list a plate!'}
             </p>
-            <Link
-              href="/plates"
-              className="inline-flex items-center justify-center px-6 py-3 bg-[var(--green)] text-white font-medium rounded-xl hover:bg-[#006B31] transition-colors"
-            >
-              View All Plates
-            </Link>
+            {(selectedState || selectedType) && (
+              <Link
+                href="/plates"
+                className="inline-flex items-center justify-center px-6 py-3 bg-[var(--green)] text-white font-medium rounded-xl hover:bg-[#006B31] transition-colors"
+              >
+                View All Plates
+              </Link>
+            )}
           </div>
         )}
 
-        {/* Load More / Pagination placeholder */}
-        {listings.length >= 8 && (
+        {/* App CTA */}
+        {listings.length > 0 && (
           <div className="mt-12 text-center">
             <p className="text-[var(--text-muted)] mb-4">
               Download the app to see more listings and set up alerts

@@ -2,11 +2,78 @@ import { Listing, ListingWithSeller, AustralianState } from '@/types/listing';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://ausplates.onrender.com';
 
-interface ListingsResponse {
-  listings: Listing[];
-  total: number;
-  page: number;
-  pageSize: number;
+// API response types (snake_case from backend)
+interface APIListing {
+  id: string;
+  slug: string;
+  combination: string;
+  state: AustralianState;
+  plate_type: string;
+  price: number;
+  description?: string;
+  is_open_to_offers: boolean;
+  is_featured: boolean;
+  status: string;
+  views_count: number;
+  user_id: string;
+  created_at: string;
+  updated_at: string;
+  seller?: {
+    id: string;
+    full_name: string;
+    avatar_url?: string;
+    response_time_avg?: number;
+    listings_count: number;
+    sold_count: number;
+  };
+}
+
+interface APIListingsResponse {
+  data: APIListing[];
+  pagination?: {
+    page: number;
+    pageSize: number;
+    total: number;
+  };
+}
+
+// Transform API response to frontend format
+function transformListing(api: APIListing): Listing {
+  return {
+    id: api.id,
+    slug: api.slug,
+    combination: api.combination,
+    state: api.state,
+    plateType: api.plate_type as Listing['plateType'],
+    price: api.price,
+    description: api.description,
+    isOpenToOffers: api.is_open_to_offers,
+    isFeatured: api.is_featured,
+    status: api.status as Listing['status'],
+    viewsCount: api.views_count,
+    sellerId: api.user_id,
+    createdAt: api.created_at,
+    updatedAt: api.updated_at,
+  };
+}
+
+function transformListingWithSeller(api: APIListing): ListingWithSeller {
+  return {
+    ...transformListing(api),
+    seller: api.seller ? {
+      id: api.seller.id,
+      fullName: api.seller.full_name,
+      avatarUrl: api.seller.avatar_url,
+      responseTimeAvg: api.seller.response_time_avg,
+      listingsCount: api.seller.listings_count,
+      soldCount: api.seller.sold_count,
+    } : {
+      id: api.user_id,
+      fullName: 'Seller',
+      listingsCount: 0,
+      soldCount: 0,
+    },
+  };
 }
 
 interface ListingsParams {
@@ -21,7 +88,7 @@ interface ListingsParams {
   sort?: 'recent' | 'price_asc' | 'price_desc';
 }
 
-export async function getListings(params: ListingsParams = {}): Promise<ListingsResponse> {
+export async function getListings(params: ListingsParams = {}): Promise<{ listings: Listing[]; total: number }> {
   const searchParams = new URLSearchParams();
 
   if (params.page) searchParams.set('page', params.page.toString());
@@ -36,13 +103,18 @@ export async function getListings(params: ListingsParams = {}): Promise<Listings
 
   const url = `${API_BASE_URL}/api/listings?${searchParams.toString()}`;
 
-  const res = await fetch(url, { next: { revalidate: 60 } }); // Cache for 60 seconds
+  const res = await fetch(url, { next: { revalidate: 60 } });
 
   if (!res.ok) {
     throw new Error('Failed to fetch listings');
   }
 
-  return res.json();
+  const data: APIListingsResponse = await res.json();
+
+  return {
+    listings: (data.data || []).map(transformListing),
+    total: data.pagination?.total || data.data?.length || 0,
+  };
 }
 
 export async function getFeaturedListings(): Promise<Listing[]> {
@@ -54,8 +126,8 @@ export async function getFeaturedListings(): Promise<Listing[]> {
     throw new Error('Failed to fetch featured listings');
   }
 
-  const data = await res.json();
-  return data.listings || data;
+  const data: APIListingsResponse = await res.json();
+  return (data.data || []).map(transformListing);
 }
 
 export async function getRecentListings(limit = 12): Promise<Listing[]> {
@@ -67,8 +139,8 @@ export async function getRecentListings(limit = 12): Promise<Listing[]> {
     throw new Error('Failed to fetch recent listings');
   }
 
-  const data = await res.json();
-  return data.listings || data;
+  const data: APIListingsResponse = await res.json();
+  return (data.data || []).map(transformListing);
 }
 
 export async function getListingBySlug(slug: string): Promise<ListingWithSeller | null> {
@@ -84,7 +156,10 @@ export async function getListingBySlug(slug: string): Promise<ListingWithSeller 
     throw new Error('Failed to fetch listing');
   }
 
-  return res.json();
+  const data = await res.json();
+  // API might return { data: listing } or just listing
+  const listing = data.data || data;
+  return transformListingWithSeller(listing);
 }
 
 export async function getListingsByState(state: AustralianState, limit = 20): Promise<Listing[]> {
@@ -99,7 +174,7 @@ export async function getListingsByState(state: AustralianState, limit = 20): Pr
 export async function getStats(): Promise<{ totalListings: number; totalSold: number; totalValue: number }> {
   const url = `${API_BASE_URL}/api/stats`;
 
-  const res = await fetch(url, { next: { revalidate: 300 } }); // Cache for 5 minutes
+  const res = await fetch(url, { next: { revalidate: 300 } });
 
   if (!res.ok) {
     // Return defaults if stats endpoint doesn't exist

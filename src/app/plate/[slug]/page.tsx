@@ -1,40 +1,13 @@
 import { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { PlateView } from '@/components/PlateView';
 import { getListingBySlug } from '@/lib/api';
 import {
   formatPrice,
   formatTimeAgo,
   STATE_NAMES,
   PLATE_TYPE_NAMES,
-  Listing,
 } from '@/types/listing';
-
-// Mock listing for development
-const MOCK_LISTING: Listing & { seller: { id: string; fullName: string; responseTimeAvg?: number; listingsCount: number; soldCount: number } } = {
-  id: '1',
-  slug: 'boss-vic',
-  combination: 'BOSS',
-  state: 'VIC',
-  plateType: 'custom',
-  price: 4500000,
-  description: 'Selling my personalised plate "BOSS". Perfect for any executive or business owner. This plate has been owned by me for 5 years and has always attracted attention. Serious buyers only.',
-  isOpenToOffers: true,
-  isFeatured: true,
-  status: 'active',
-  viewsCount: 234,
-  sellerId: '1',
-  createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-  updatedAt: new Date().toISOString(),
-  seller: {
-    id: '1',
-    fullName: 'John Smith',
-    responseTimeAvg: 30,
-    listingsCount: 3,
-    soldCount: 5,
-  },
-};
 
 interface PageProps {
   params: Promise<{ slug: string }>;
@@ -43,18 +16,7 @@ interface PageProps {
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { slug } = await params;
 
-  // Try to fetch real listing
-  let listing;
-  try {
-    listing = await getListingBySlug(slug);
-  } catch {
-    listing = null;
-  }
-
-  // Fall back to mock if slug matches
-  if (!listing && slug === 'boss-vic') {
-    listing = MOCK_LISTING;
-  }
+  const listing = await getListingBySlug(slug);
 
   if (!listing) {
     return {
@@ -93,18 +55,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 export default async function ListingDetailPage({ params }: PageProps) {
   const { slug } = await params;
 
-  // Try to fetch real listing
-  let listing;
-  try {
-    listing = await getListingBySlug(slug);
-  } catch {
-    listing = null;
-  }
-
-  // Fall back to mock if slug matches
-  if (!listing && slug === 'boss-vic') {
-    listing = MOCK_LISTING;
-  }
+  const listing = await getListingBySlug(slug);
 
   if (!listing) {
     notFound();
@@ -267,8 +218,12 @@ export default async function ListingDetailPage({ params }: PageProps) {
               {listing.seller && (
                 <div className="mt-6 p-6 border border-[var(--border)] rounded-2xl">
                   <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 bg-[var(--green)] rounded-full flex items-center justify-center text-white font-semibold text-lg">
-                      {listing.seller.fullName.charAt(0)}
+                    <div className="w-12 h-12 bg-[var(--green)] rounded-full flex items-center justify-center text-white font-semibold text-lg overflow-hidden">
+                      {listing.seller.avatarUrl ? (
+                        <img src={listing.seller.avatarUrl} alt={listing.seller.fullName} className="w-full h-full object-cover" />
+                      ) : (
+                        listing.seller.fullName.charAt(0)
+                      )}
                     </div>
                     <div>
                       <p className="font-medium text-[var(--text)]">{listing.seller.fullName}</p>

@@ -4,158 +4,27 @@ import { PlateView } from '@/components/PlateView';
 import { getFeaturedListings, getRecentListings } from '@/lib/api';
 import { AustralianState, STATE_NAMES, Listing } from '@/types/listing';
 
-// Mock data for development (until API has real data)
-const MOCK_FEATURED: Listing[] = [
-  {
-    id: '1',
-    slug: 'boss-vic',
-    combination: 'BOSS',
-    state: 'VIC',
-    plateType: 'custom',
-    price: 4500000,
-    isOpenToOffers: true,
-    isFeatured: true,
-    status: 'active',
-    viewsCount: 234,
-    sellerId: '1',
-    createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: '2',
-    slug: 'ceo-nsw',
-    combination: 'CEO',
-    state: 'NSW',
-    plateType: 'custom',
-    price: 8500000,
-    isOpenToOffers: false,
-    isFeatured: true,
-    status: 'active',
-    viewsCount: 456,
-    sellerId: '2',
-    createdAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: '3',
-    slug: 'crypto-qld',
-    combination: 'CRYPTO',
-    state: 'QLD',
-    plateType: 'custom',
-    price: 2500000,
-    isOpenToOffers: true,
-    isFeatured: true,
-    status: 'active',
-    viewsCount: 189,
-    sellerId: '3',
-    createdAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: '4',
-    slug: 'legend-vic',
-    combination: 'LEGEND',
-    state: 'VIC',
-    plateType: 'custom',
-    price: 3200000,
-    isOpenToOffers: true,
-    isFeatured: true,
-    status: 'active',
-    viewsCount: 312,
-    sellerId: '1',
-    createdAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-];
-
-const MOCK_RECENT: Listing[] = [
-  ...MOCK_FEATURED,
-  {
-    id: '5',
-    slug: '4eva-nsw',
-    combination: '4EVA',
-    state: 'NSW',
-    plateType: 'custom',
-    price: 1800000,
-    isOpenToOffers: true,
-    isFeatured: false,
-    status: 'active',
-    viewsCount: 98,
-    sellerId: '4',
-    createdAt: new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: '6',
-    slug: 'vip-1-vic',
-    combination: 'VIP 1',
-    state: 'VIC',
-    plateType: 'heritage',
-    price: 15000000,
-    isOpenToOffers: false,
-    isFeatured: false,
-    status: 'active',
-    viewsCount: 567,
-    sellerId: '5',
-    createdAt: new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: '7',
-    slug: 'king-sa',
-    combination: 'KING',
-    state: 'SA',
-    plateType: 'custom',
-    price: 950000,
-    isOpenToOffers: true,
-    isFeatured: false,
-    status: 'active',
-    viewsCount: 145,
-    sellerId: '6',
-    createdAt: new Date(Date.now() - 18 * 60 * 60 * 1000).toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: '8',
-    slug: 'queen-wa',
-    combination: 'QUEEN',
-    state: 'WA',
-    plateType: 'custom',
-    price: 1100000,
-    isOpenToOffers: true,
-    isFeatured: false,
-    status: 'active',
-    viewsCount: 203,
-    sellerId: '7',
-    createdAt: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-];
-
 const STATES: AustralianState[] = ['VIC', 'NSW', 'QLD', 'SA', 'WA', 'TAS', 'NT', 'ACT'];
 
 export default async function HomePage() {
-  // Try to fetch from API, fall back to mock data
-  let featuredListings = MOCK_FEATURED;
-  let recentListings = MOCK_RECENT;
+  // Fetch from API
+  let featuredListings: Listing[] = [];
+  let recentListings: Listing[] = [];
 
   try {
-    const featured = await getFeaturedListings();
-    if (featured && featured.length > 0) {
-      featuredListings = featured;
-    }
+    featuredListings = await getFeaturedListings();
   } catch {
-    // Use mock data
+    // API error - continue with empty
   }
 
   try {
-    const recent = await getRecentListings(8);
-    if (recent && recent.length > 0) {
-      recentListings = recent;
-    }
+    recentListings = await getRecentListings(8);
   } catch {
-    // Use mock data
+    // API error - continue with empty
   }
+
+  // If no featured listings, use recent for the featured section
+  const displayFeatured = featuredListings.length > 0 ? featuredListings : recentListings.slice(0, 4);
 
   return (
     <div>
@@ -197,7 +66,7 @@ export default async function HomePage() {
               {/* Stats */}
               <div className="mt-12 grid grid-cols-3 gap-8">
                 <div>
-                  <p className="text-2xl md:text-3xl font-semibold text-[var(--text)]">1,000+</p>
+                  <p className="text-2xl md:text-3xl font-semibold text-[var(--text)]">{recentListings.length || '100'}+</p>
                   <p className="text-sm text-[var(--text-muted)]">Active Listings</p>
                 </div>
                 <div>
@@ -230,36 +99,38 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* Featured Listings */}
-      <section className="py-16 bg-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between mb-8">
-            <div>
-              <h2 className="text-2xl md:text-3xl font-semibold text-[var(--text)]">
-                Featured Plates
-              </h2>
-              <p className="mt-1 text-[var(--text-secondary)]">
-                Premium listings from sellers across Australia
-              </p>
+      {/* Featured/Recent Listings */}
+      {displayFeatured.length > 0 && (
+        <section className="py-16 bg-white">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="flex items-center justify-between mb-8">
+              <div>
+                <h2 className="text-2xl md:text-3xl font-semibold text-[var(--text)]">
+                  {featuredListings.length > 0 ? 'Featured Plates' : 'Latest Plates'}
+                </h2>
+                <p className="mt-1 text-[var(--text-secondary)]">
+                  {featuredListings.length > 0 ? 'Premium listings from sellers across Australia' : 'Just listed across Australia'}
+                </p>
+              </div>
+              <Link
+                href="/plates"
+                className="hidden sm:inline-flex items-center gap-1 text-sm font-medium text-[var(--green)] hover:text-[#006B31] transition-colors"
+              >
+                View All
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </Link>
             </div>
-            <Link
-              href="/plates?featured=true"
-              className="hidden sm:inline-flex items-center gap-1 text-sm font-medium text-[var(--green)] hover:text-[#006B31] transition-colors"
-            >
-              View All
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-              </svg>
-            </Link>
-          </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
-            {featuredListings.slice(0, 4).map((listing) => (
-              <ListingCard key={listing.id} listing={listing} />
-            ))}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
+              {displayFeatured.slice(0, 4).map((listing) => (
+                <ListingCard key={listing.id} listing={listing} />
+              ))}
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
+      )}
 
       {/* Browse by State */}
       <section className="py-16 bg-[var(--background-subtle)]">
@@ -290,36 +161,38 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* Recent Listings */}
-      <section className="py-16 bg-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between mb-8">
-            <div>
-              <h2 className="text-2xl md:text-3xl font-semibold text-[var(--text)]">
-                Recent Listings
-              </h2>
-              <p className="mt-1 text-[var(--text-secondary)]">
-                Just listed across Australia
-              </p>
+      {/* Recent Listings - only show if we have more than featured */}
+      {recentListings.length > 4 && (
+        <section className="py-16 bg-white">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="flex items-center justify-between mb-8">
+              <div>
+                <h2 className="text-2xl md:text-3xl font-semibold text-[var(--text)]">
+                  Recent Listings
+                </h2>
+                <p className="mt-1 text-[var(--text-secondary)]">
+                  Just listed across Australia
+                </p>
+              </div>
+              <Link
+                href="/plates"
+                className="hidden sm:inline-flex items-center gap-1 text-sm font-medium text-[var(--green)] hover:text-[#006B31] transition-colors"
+              >
+                View All
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </Link>
             </div>
-            <Link
-              href="/plates"
-              className="hidden sm:inline-flex items-center gap-1 text-sm font-medium text-[var(--green)] hover:text-[#006B31] transition-colors"
-            >
-              View All
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-              </svg>
-            </Link>
-          </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
-            {recentListings.slice(0, 8).map((listing) => (
-              <ListingCard key={listing.id} listing={listing} />
-            ))}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
+              {recentListings.slice(0, 8).map((listing) => (
+                <ListingCard key={listing.id} listing={listing} />
+              ))}
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
+      )}
 
       {/* App Download CTA */}
       <section className="py-16 bg-[var(--plate-background)]">
@@ -371,7 +244,7 @@ export default async function HomePage() {
                       <PlateView combination="APP" state="VIC" size="medium" />
                     </div>
                     <p className="text-lg font-semibold text-[var(--text)]">AusPlates</p>
-                    <p className="text-sm text-[var(--text-muted)]">Coming Soon</p>
+                    <p className="text-sm text-[var(--text-muted)]">Available Now</p>
                   </div>
                 </div>
               </div>
