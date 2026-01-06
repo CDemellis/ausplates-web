@@ -183,3 +183,17 @@ export async function getStats(): Promise<{ totalListings: number; totalSold: nu
 
   return res.json();
 }
+
+// Get all listing slugs for sitemap
+export async function getAllListingSlugs(): Promise<{ slug: string; updatedAt: string }[]> {
+  try {
+    // Fetch a large number of listings for sitemap
+    const response = await getListings({ pageSize: 500, sort: 'recent' });
+    return (response?.listings || []).map((listing) => ({
+      slug: listing.slug,
+      updatedAt: listing.updatedAt,
+    }));
+  } catch {
+    return [];
+  }
+}

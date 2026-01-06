@@ -43,21 +43,12 @@ export const metadata: Metadata = {
     title: 'AusPlates - Australian Personalised Number Plates Marketplace',
     description:
       'Buy and sell personalised number plates across Australia. Browse thousands of custom, heritage, and euro plates.',
-    images: [
-      {
-        url: '/og-image.png',
-        width: 1200,
-        height: 630,
-        alt: 'AusPlates - Australian Personalised Number Plates',
-      },
-    ],
   },
   twitter: {
     card: 'summary_large_image',
     title: 'AusPlates - Australian Personalised Number Plates Marketplace',
     description:
       'Buy and sell personalised number plates across Australia. Browse thousands of plates.',
-    images: ['/og-image.png'],
   },
   robots: {
     index: true,
@@ -65,7 +56,6 @@ export const metadata: Metadata = {
   },
   icons: {
     icon: '/favicon.ico',
-    apple: '/apple-touch-icon.png',
   },
 };
 
