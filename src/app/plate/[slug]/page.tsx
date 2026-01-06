@@ -7,10 +7,58 @@ import {
   formatTimeAgo,
   STATE_NAMES,
   PLATE_TYPE_NAMES,
+  getColorSchemeColors,
 } from '@/types/listing';
 
 interface PageProps {
   params: Promise<{ slug: string }>;
+}
+
+// Light backgrounds need a dark container for visibility
+const LIGHT_BACKGROUNDS = ['#FFFFFF', '#FFD100', '#F5F5F5'];
+
+function PlateHero({ listing }: { listing: any }) {
+  const colors = getColorSchemeColors(listing.colorScheme);
+  const isLightBackground = LIGHT_BACKGROUNDS.includes(colors.background.toUpperCase());
+  const containerColor = isLightBackground ? '#1A1A2E' : '#F0F0F0';
+
+  return (
+    <div
+      className="rounded-2xl p-8 md:p-12 flex flex-col items-center justify-center min-h-[300px]"
+      style={{ backgroundColor: containerColor }}
+    >
+      {listing.isFeatured && (
+        <span className="inline-flex items-center gap-1 px-2 py-1 mb-6 bg-[var(--gold)] text-[var(--text)] text-xs font-semibold tracking-wide rounded">
+          <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+          </svg>
+          FEATURED
+        </span>
+      )}
+
+      {/* The plate itself */}
+      <div
+        className="rounded-lg px-8 py-6 border-2 flex flex-col items-center"
+        style={{
+          backgroundColor: colors.background,
+          borderColor: isLightBackground ? '#E5E5E5' : colors.background,
+        }}
+      >
+        <p
+          className="text-sm font-semibold tracking-widest mb-1"
+          style={{ color: colors.text, opacity: 0.7 }}
+        >
+          {listing.state}
+        </p>
+        <h1
+          className="text-4xl md:text-5xl lg:text-6xl font-bold tracking-wider"
+          style={{ color: colors.text }}
+        >
+          {listing.combination}
+        </h1>
+      </div>
+    </div>
+  );
 }
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
@@ -120,23 +168,7 @@ export default async function ListingDetailPage({ params }: PageProps) {
           <div className="grid lg:grid-cols-2 gap-8 lg:gap-12">
             {/* Left: Plate Display */}
             <div>
-              <div className="bg-[var(--plate-background)] rounded-2xl p-8 md:p-12 flex flex-col items-center justify-center min-h-[300px]">
-                {listing.isFeatured && (
-                  <span className="inline-flex items-center gap-1 px-2 py-1 mb-6 bg-[var(--gold)] text-[var(--text)] text-xs font-semibold tracking-wide rounded">
-                    <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                      <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                    </svg>
-                    FEATURED
-                  </span>
-                )}
-
-                <p className="text-[var(--green)] text-sm font-semibold tracking-widest mb-2">
-                  {listing.state}
-                </p>
-                <h1 className="text-white text-4xl md:text-5xl lg:text-6xl font-bold tracking-wider">
-                  {listing.combination}
-                </h1>
-              </div>
+              <PlateHero listing={listing} />
 
               {/* Stats */}
               <div className="mt-6 flex items-center gap-6 text-sm text-[var(--text-muted)]">

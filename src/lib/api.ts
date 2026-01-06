@@ -1,4 +1,4 @@
-import { Listing, ListingWithSeller, AustralianState } from '@/types/listing';
+import { Listing, ListingWithSeller, AustralianState, PlateColorScheme, PlateSizeFormat } from '@/types/listing';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://ausplates.onrender.com';
 
@@ -16,6 +16,8 @@ interface APIListing {
   status: string;
   views_count: number;
   user_id: string;
+  color_scheme?: PlateColorScheme;
+  size_format?: PlateSizeFormat;
   created_at: string;
   updated_at: string;
   seller?: {
@@ -52,6 +54,8 @@ function transformListing(api: APIListing): Listing {
     status: api.status as Listing['status'],
     viewsCount: api.views_count,
     sellerId: api.user_id,
+    colorScheme: api.color_scheme,
+    sizeFormat: api.size_format,
     createdAt: api.created_at,
     updatedAt: api.updated_at,
   };

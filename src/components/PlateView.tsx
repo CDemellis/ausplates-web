@@ -1,9 +1,10 @@
-import { AustralianState } from '@/types/listing';
+import { AustralianState, PlateColorScheme, getColorSchemeColors } from '@/types/listing';
 
 interface PlateViewProps {
   combination: string;
   state: AustralianState;
   size?: 'small' | 'medium' | 'large';
+  colorScheme?: PlateColorScheme;
   className?: string;
 }
 
@@ -25,34 +26,51 @@ const sizeStyles = {
   },
 };
 
-export function PlateView({ combination, state, size = 'medium', className = '' }: PlateViewProps) {
+// Light backgrounds that need dark container around them for visibility
+const LIGHT_BACKGROUNDS = ['#FFFFFF', '#FFD100', '#F5F5F5'];
+
+export function PlateView({
+  combination,
+  state,
+  size = 'medium',
+  colorScheme,
+  className = ''
+}: PlateViewProps) {
   const styles = sizeStyles[size];
+  const colors = getColorSchemeColors(colorScheme);
+  const isLightBackground = LIGHT_BACKGROUNDS.includes(colors.background.toUpperCase());
 
   return (
     <div
       className={`
         inline-flex flex-col items-center justify-center
-        bg-[var(--plate-background)] rounded-md
+        rounded-md border-2
         ${styles.container}
         ${className}
       `}
+      style={{
+        backgroundColor: colors.background,
+        borderColor: isLightBackground ? '#E5E5E5' : colors.background,
+      }}
     >
       <span
         className={`
           font-semibold tracking-widest uppercase
-          text-[var(--green)]
           ${styles.state}
         `}
+        style={{ color: colors.text, opacity: 0.7 }}
       >
         {state}
       </span>
       <span
         className={`
           font-bold tracking-wider uppercase
-          text-white
           ${styles.combo}
         `}
-        style={{ fontFamily: 'system-ui, -apple-system, sans-serif' }}
+        style={{
+          color: colors.text,
+          fontFamily: 'system-ui, -apple-system, sans-serif',
+        }}
       >
         {combination}
       </span>
