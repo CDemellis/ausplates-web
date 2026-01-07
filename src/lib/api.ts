@@ -17,7 +17,8 @@ interface APIListing {
   views_count: number;
   user_id: string;
   color_scheme?: PlateColorScheme;
-  size_format?: PlateSizeFormat;
+  size_format?: PlateSizeFormat;  // Legacy
+  size_formats?: PlateSizeFormat[];
   created_at: string;
   updated_at: string;
   seller?: {
@@ -55,7 +56,7 @@ function transformListing(api: APIListing): Listing {
     viewsCount: api.views_count,
     sellerId: api.user_id,
     colorScheme: api.color_scheme,
-    sizeFormat: api.size_format,
+    sizeFormats: api.size_formats || [],
     createdAt: api.created_at,
     updatedAt: api.updated_at,
   };
