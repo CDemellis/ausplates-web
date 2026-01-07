@@ -1,12 +1,12 @@
 /**
- * Plate Format Icons - Simple outline silhouettes
- * SF Symbol-style grey outline icons showing plate shapes
+ * Plate Format Icons - Outline icons with text labels
+ * Shows plate shape outline with abbreviated type name inside
  */
 
 interface PlateFormatIconProps {
   size?: number; // Height in pixels (width scales proportionally)
   className?: string;
-  color?: string; // Stroke color (default grey)
+  color?: string; // Stroke/text color (default grey)
   strokeWidth?: number;
 }
 
@@ -28,6 +28,7 @@ export function PlateIconStandard({
   const height = size;
   const radius = height * 0.12;
   const padding = strokeWidth / 2;
+  const fontSize = height * 0.4;
 
   return (
     <svg
@@ -48,6 +49,18 @@ export function PlateIconStandard({
         stroke={color}
         strokeWidth={strokeWidth}
       />
+      <text
+        x={width / 2}
+        y={height / 2}
+        textAnchor="middle"
+        dominantBaseline="central"
+        fill={color}
+        fontSize={fontSize}
+        fontFamily="system-ui, -apple-system, sans-serif"
+        fontWeight="500"
+      >
+        STD
+      </text>
     </svg>
   );
 }
@@ -62,6 +75,7 @@ export function PlateIconSlimline({
   const height = size;
   const radius = height * 0.15;
   const padding = strokeWidth / 2;
+  const fontSize = height * 0.45;
 
   return (
     <svg
@@ -82,6 +96,18 @@ export function PlateIconSlimline({
         stroke={color}
         strokeWidth={strokeWidth}
       />
+      <text
+        x={width / 2}
+        y={height / 2}
+        textAnchor="middle"
+        dominantBaseline="central"
+        fill={color}
+        fontSize={fontSize}
+        fontFamily="system-ui, -apple-system, sans-serif"
+        fontWeight="500"
+      >
+        SLIM
+      </text>
     </svg>
   );
 }
@@ -97,6 +123,7 @@ export function PlateIconEuro({
   const radius = height * 0.12;
   const padding = strokeWidth / 2;
   const bandWidth = width * 0.08;
+  const fontSize = height * 0.45;
 
   return (
     <svg
@@ -106,7 +133,6 @@ export function PlateIconEuro({
       className={className}
       xmlns="http://www.w3.org/2000/svg"
     >
-      {/* Main outline */}
       <rect
         x={padding}
         y={padding}
@@ -118,7 +144,6 @@ export function PlateIconEuro({
         stroke={color}
         strokeWidth={strokeWidth}
       />
-      {/* Euro band divider line */}
       <line
         x1={bandWidth}
         y1={padding}
@@ -127,6 +152,18 @@ export function PlateIconEuro({
         stroke={color}
         strokeWidth={strokeWidth}
       />
+      <text
+        x={(width + bandWidth) / 2}
+        y={height / 2}
+        textAnchor="middle"
+        dominantBaseline="central"
+        fill={color}
+        fontSize={fontSize}
+        fontFamily="system-ui, -apple-system, sans-serif"
+        fontWeight="500"
+      >
+        EURO
+      </text>
     </svg>
   );
 }
@@ -141,6 +178,7 @@ export function PlateIconSquare({
   const height = size;
   const radius = height * 0.1;
   const padding = strokeWidth / 2;
+  const fontSize = height * 0.28;
 
   return (
     <svg
@@ -161,6 +199,18 @@ export function PlateIconSquare({
         stroke={color}
         strokeWidth={strokeWidth}
       />
+      <text
+        x={width / 2}
+        y={height / 2}
+        textAnchor="middle"
+        dominantBaseline="central"
+        fill={color}
+        fontSize={fontSize}
+        fontFamily="system-ui, -apple-system, sans-serif"
+        fontWeight="500"
+      >
+        SQR
+      </text>
     </svg>
   );
 }
@@ -175,6 +225,7 @@ export function PlateIconMotorcycle({
   const height = size;
   const radius = height * 0.1;
   const padding = strokeWidth / 2;
+  const fontSize = height * 0.3;
 
   return (
     <svg
@@ -195,6 +246,18 @@ export function PlateIconMotorcycle({
         stroke={color}
         strokeWidth={strokeWidth}
       />
+      <text
+        x={width / 2}
+        y={height / 2}
+        textAnchor="middle"
+        dominantBaseline="central"
+        fill={color}
+        fontSize={fontSize}
+        fontFamily="system-ui, -apple-system, sans-serif"
+        fontWeight="500"
+      >
+        MOTO
+      </text>
     </svg>
   );
 }
@@ -209,6 +272,7 @@ export function PlateIconJDM({
   const height = size;
   const radius = height * 0.1;
   const padding = strokeWidth / 2;
+  const fontSize = height * 0.4;
 
   return (
     <svg
@@ -229,6 +293,18 @@ export function PlateIconJDM({
         stroke={color}
         strokeWidth={strokeWidth}
       />
+      <text
+        x={width / 2}
+        y={height / 2}
+        textAnchor="middle"
+        dominantBaseline="central"
+        fill={color}
+        fontSize={fontSize}
+        fontFamily="system-ui, -apple-system, sans-serif"
+        fontWeight="500"
+      >
+        JDM
+      </text>
     </svg>
   );
 }
