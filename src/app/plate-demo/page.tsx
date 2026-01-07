@@ -33,78 +33,63 @@ export default function PlateDemoPage() {
     <div className="min-h-screen bg-neutral-100 p-8">
       <h1 className="text-3xl font-bold mb-8">Plate Components Demo</h1>
 
-      {/* Plate Format Icons */}
+      {/* Plate Format Icons - Outline Style */}
       <section className="mb-12">
-        <h2 className="text-xl font-semibold mb-4">Plate Format Icons</h2>
+        <h2 className="text-xl font-semibold mb-4">Plate Format Icons (Outline)</h2>
         <div className="bg-white p-6 rounded-xl space-y-8">
-          {/* Size 24 */}
+          {/* Default grey */}
           <div>
-            <p className="text-sm text-gray-500 mb-3">Size: 24px height</p>
-            <div className="flex flex-wrap items-center gap-4">
-              {plateFormats.map((format) => (
-                <div key={format} className="flex flex-col items-center gap-1">
-                  <PlateFormatIcon type={format} size={24} />
-                  <span className="text-xs text-gray-400">{format}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Size 32 */}
-          <div>
-            <p className="text-sm text-gray-500 mb-3">Size: 32px height (default)</p>
-            <div className="flex flex-wrap items-center gap-4">
-              {plateFormats.map((format) => (
-                <div key={format} className="flex flex-col items-center gap-1">
-                  <PlateFormatIcon type={format} size={32} />
-                  <span className="text-xs text-gray-400">{format}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Size 48 */}
-          <div>
-            <p className="text-sm text-gray-500 mb-3">Size: 48px height</p>
-            <div className="flex flex-wrap items-center gap-4">
+            <p className="text-sm text-gray-500 mb-3">Default (24px, grey)</p>
+            <div className="flex flex-wrap items-center gap-6">
               {plateFormats.map((format) => (
                 <div key={format} className="flex flex-col items-center gap-2">
-                  <PlateFormatIcon type={format} size={48} />
+                  <PlateFormatIcon type={format} />
                   <span className="text-xs text-gray-400">{format}</span>
                 </div>
               ))}
             </div>
           </div>
 
-          {/* Custom colors */}
+          {/* Larger size */}
           <div>
-            <p className="text-sm text-gray-500 mb-3">Custom Colors (Yellow on Black)</p>
-            <div className="flex flex-wrap items-center gap-4">
+            <p className="text-sm text-gray-500 mb-3">Size: 32px</p>
+            <div className="flex flex-wrap items-center gap-6">
+              {plateFormats.map((format) => (
+                <div key={format} className="flex flex-col items-center gap-2">
+                  <PlateFormatIcon type={format} size={32} strokeWidth={2} />
+                  <span className="text-xs text-gray-400">{format}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Green (Australian Green) */}
+          <div>
+            <p className="text-sm text-gray-500 mb-3">Australian Green</p>
+            <div className="flex flex-wrap items-center gap-6">
               {plateFormats.map((format) => (
                 <PlateFormatIcon
                   key={format}
                   type={format}
-                  size={32}
-                  fill="#FFCD00"
-                  stroke="#1A1A1A"
-                  labelColor="#1A1A1A"
+                  size={28}
+                  color="#00843D"
+                  strokeWidth={2}
                 />
               ))}
             </div>
           </div>
 
-          {/* Light background */}
+          {/* On dark background */}
           <div className="bg-neutral-800 p-4 rounded-lg">
-            <p className="text-sm text-gray-400 mb-3">On Dark Background (White scheme)</p>
-            <div className="flex flex-wrap items-center gap-4">
+            <p className="text-sm text-gray-400 mb-3">On Dark Background (white)</p>
+            <div className="flex flex-wrap items-center gap-6">
               {plateFormats.map((format) => (
                 <PlateFormatIcon
                   key={format}
                   type={format}
-                  size={32}
-                  fill="#FFFFFF"
-                  stroke="#1A1A1A"
-                  labelColor="#1A1A1A"
+                  size={28}
+                  color="#FFFFFF"
+                  strokeWidth={1.5}
                 />
               ))}
             </div>

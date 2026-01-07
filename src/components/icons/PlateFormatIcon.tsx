@@ -1,14 +1,13 @@
 /**
- * Plate Format Icons - Realistic plate shape icons with type labels
- * Each icon matches the actual aspect ratio of Australian plate formats
+ * Plate Format Icons - Simple outline silhouettes
+ * SF Symbol-style grey outline icons showing plate shapes
  */
 
 interface PlateFormatIconProps {
   size?: number; // Height in pixels (width scales proportionally)
   className?: string;
-  fill?: string;
-  stroke?: string;
-  labelColor?: string;
+  color?: string; // Stroke color (default grey)
+  strokeWidth?: number;
 }
 
 // Plate format aspect ratios (width:height)
@@ -19,25 +18,16 @@ interface PlateFormatIconProps {
 // Motorcycle: 180x100mm = 1.8:1
 // JDM: 330x165mm = 2:1
 
-const defaultProps: PlateFormatIconProps = {
-  size: 32,
-  fill: '#1A1A1A',
-  stroke: '#FFFFFF',
-  labelColor: '#FFFFFF',
-};
-
 export function PlateIconStandard({
-  size = 32,
+  size = 24,
   className = '',
-  fill = defaultProps.fill,
-  stroke = defaultProps.stroke,
-  labelColor = defaultProps.labelColor,
+  color = '#6B7280',
+  strokeWidth = 1.5,
 }: PlateFormatIconProps) {
   const width = size * 2.78;
   const height = size;
-  const radius = height * 0.08;
-  const borderPadding = height * 0.06;
-  const borderWidth = height * 0.025;
+  const radius = height * 0.12;
+  const padding = strokeWidth / 2;
 
   return (
     <svg
@@ -47,57 +37,31 @@ export function PlateIconStandard({
       className={className}
       xmlns="http://www.w3.org/2000/svg"
     >
-      {/* Outer plate */}
       <rect
-        x="0"
-        y="0"
-        width={width}
-        height={height}
+        x={padding}
+        y={padding}
+        width={width - strokeWidth}
+        height={height - strokeWidth}
         rx={radius}
         ry={radius}
-        fill={fill}
-      />
-      {/* Inner border */}
-      <rect
-        x={borderPadding}
-        y={borderPadding}
-        width={width - borderPadding * 2}
-        height={height - borderPadding * 2}
-        rx={radius - borderPadding / 2}
-        ry={radius - borderPadding / 2}
         fill="none"
-        stroke={stroke}
-        strokeWidth={borderWidth}
+        stroke={color}
+        strokeWidth={strokeWidth}
       />
-      {/* Label */}
-      <text
-        x={width / 2}
-        y={height / 2}
-        textAnchor="middle"
-        dominantBaseline="middle"
-        fill={labelColor}
-        fontSize={height * 0.32}
-        fontFamily="var(--font-bebas-neue), 'Bebas Neue', sans-serif"
-        letterSpacing="0.05em"
-      >
-        STANDARD
-      </text>
     </svg>
   );
 }
 
 export function PlateIconSlimline({
-  size = 32,
+  size = 24,
   className = '',
-  fill = defaultProps.fill,
-  stroke = defaultProps.stroke,
-  labelColor = defaultProps.labelColor,
+  color = '#6B7280',
+  strokeWidth = 1.5,
 }: PlateFormatIconProps) {
   const width = size * 4.73;
   const height = size;
-  const radius = height * 0.1;
-  const borderPadding = height * 0.08;
-  const borderWidth = height * 0.03;
+  const radius = height * 0.15;
+  const padding = strokeWidth / 2;
 
   return (
     <svg
@@ -108,53 +72,31 @@ export function PlateIconSlimline({
       xmlns="http://www.w3.org/2000/svg"
     >
       <rect
-        x="0"
-        y="0"
-        width={width}
-        height={height}
+        x={padding}
+        y={padding}
+        width={width - strokeWidth}
+        height={height - strokeWidth}
         rx={radius}
         ry={radius}
-        fill={fill}
-      />
-      <rect
-        x={borderPadding}
-        y={borderPadding}
-        width={width - borderPadding * 2}
-        height={height - borderPadding * 2}
-        rx={radius - borderPadding / 2}
-        ry={radius - borderPadding / 2}
         fill="none"
-        stroke={stroke}
-        strokeWidth={borderWidth}
+        stroke={color}
+        strokeWidth={strokeWidth}
       />
-      <text
-        x={width / 2}
-        y={height / 2}
-        textAnchor="middle"
-        dominantBaseline="middle"
-        fill={labelColor}
-        fontSize={height * 0.42}
-        fontFamily="var(--font-bebas-neue), 'Bebas Neue', sans-serif"
-        letterSpacing="0.08em"
-      >
-        SLIMLINE
-      </text>
     </svg>
   );
 }
 
 export function PlateIconEuro({
-  size = 32,
+  size = 24,
   className = '',
-  fill = defaultProps.fill,
-  stroke = defaultProps.stroke,
-  labelColor = defaultProps.labelColor,
+  color = '#6B7280',
+  strokeWidth = 1.5,
 }: PlateFormatIconProps) {
   const width = size * 4.73;
   const height = size;
-  const radius = height * 0.08;
-  const borderPadding = height * 0.06;
-  const borderWidth = height * 0.025;
+  const radius = height * 0.12;
+  const padding = strokeWidth / 2;
+  const bandWidth = width * 0.08;
 
   return (
     <svg
@@ -164,73 +106,41 @@ export function PlateIconEuro({
       className={className}
       xmlns="http://www.w3.org/2000/svg"
     >
+      {/* Main outline */}
       <rect
-        x="0"
-        y="0"
-        width={width}
-        height={height}
+        x={padding}
+        y={padding}
+        width={width - strokeWidth}
+        height={height - strokeWidth}
         rx={radius}
         ry={radius}
-        fill={fill}
-      />
-      {/* Euro-style blue band on left */}
-      <clipPath id="euroClip">
-        <rect
-          x="0"
-          y="0"
-          width={width}
-          height={height}
-          rx={radius}
-          ry={radius}
-        />
-      </clipPath>
-      <rect
-        x="0"
-        y="0"
-        width={width * 0.08}
-        height={height}
-        fill="#003399"
-        clipPath="url(#euroClip)"
-      />
-      <rect
-        x={borderPadding}
-        y={borderPadding}
-        width={width - borderPadding * 2}
-        height={height - borderPadding * 2}
-        rx={radius - borderPadding / 2}
-        ry={radius - borderPadding / 2}
         fill="none"
-        stroke={stroke}
-        strokeWidth={borderWidth}
+        stroke={color}
+        strokeWidth={strokeWidth}
       />
-      <text
-        x={width / 2 + width * 0.04}
-        y={height / 2}
-        textAnchor="middle"
-        dominantBaseline="middle"
-        fill={labelColor}
-        fontSize={height * 0.42}
-        fontFamily="var(--font-bebas-neue), 'Bebas Neue', sans-serif"
-        letterSpacing="0.08em"
-      >
-        EURO
-      </text>
+      {/* Euro band divider line */}
+      <line
+        x1={bandWidth}
+        y1={padding}
+        x2={bandWidth}
+        y2={height - padding}
+        stroke={color}
+        strokeWidth={strokeWidth}
+      />
     </svg>
   );
 }
 
 export function PlateIconSquare({
-  size = 32,
+  size = 24,
   className = '',
-  fill = defaultProps.fill,
-  stroke = defaultProps.stroke,
-  labelColor = defaultProps.labelColor,
+  color = '#6B7280',
+  strokeWidth = 1.5,
 }: PlateFormatIconProps) {
   const width = size * 1.4;
   const height = size;
-  const radius = height * 0.06;
-  const borderPadding = height * 0.05;
-  const borderWidth = height * 0.02;
+  const radius = height * 0.1;
+  const padding = strokeWidth / 2;
 
   return (
     <svg
@@ -241,53 +151,30 @@ export function PlateIconSquare({
       xmlns="http://www.w3.org/2000/svg"
     >
       <rect
-        x="0"
-        y="0"
-        width={width}
-        height={height}
+        x={padding}
+        y={padding}
+        width={width - strokeWidth}
+        height={height - strokeWidth}
         rx={radius}
         ry={radius}
-        fill={fill}
-      />
-      <rect
-        x={borderPadding}
-        y={borderPadding}
-        width={width - borderPadding * 2}
-        height={height - borderPadding * 2}
-        rx={radius - borderPadding / 2}
-        ry={radius - borderPadding / 2}
         fill="none"
-        stroke={stroke}
-        strokeWidth={borderWidth}
+        stroke={color}
+        strokeWidth={strokeWidth}
       />
-      <text
-        x={width / 2}
-        y={height / 2}
-        textAnchor="middle"
-        dominantBaseline="middle"
-        fill={labelColor}
-        fontSize={height * 0.22}
-        fontFamily="var(--font-bebas-neue), 'Bebas Neue', sans-serif"
-        letterSpacing="0.05em"
-      >
-        SQUARE
-      </text>
     </svg>
   );
 }
 
 export function PlateIconMotorcycle({
-  size = 32,
+  size = 24,
   className = '',
-  fill = defaultProps.fill,
-  stroke = defaultProps.stroke,
-  labelColor = defaultProps.labelColor,
+  color = '#6B7280',
+  strokeWidth = 1.5,
 }: PlateFormatIconProps) {
   const width = size * 1.8;
   const height = size;
-  const radius = height * 0.07;
-  const borderPadding = height * 0.055;
-  const borderWidth = height * 0.022;
+  const radius = height * 0.1;
+  const padding = strokeWidth / 2;
 
   return (
     <svg
@@ -298,53 +185,30 @@ export function PlateIconMotorcycle({
       xmlns="http://www.w3.org/2000/svg"
     >
       <rect
-        x="0"
-        y="0"
-        width={width}
-        height={height}
+        x={padding}
+        y={padding}
+        width={width - strokeWidth}
+        height={height - strokeWidth}
         rx={radius}
         ry={radius}
-        fill={fill}
-      />
-      <rect
-        x={borderPadding}
-        y={borderPadding}
-        width={width - borderPadding * 2}
-        height={height - borderPadding * 2}
-        rx={radius - borderPadding / 2}
-        ry={radius - borderPadding / 2}
         fill="none"
-        stroke={stroke}
-        strokeWidth={borderWidth}
+        stroke={color}
+        strokeWidth={strokeWidth}
       />
-      <text
-        x={width / 2}
-        y={height / 2}
-        textAnchor="middle"
-        dominantBaseline="middle"
-        fill={labelColor}
-        fontSize={height * 0.2}
-        fontFamily="var(--font-bebas-neue), 'Bebas Neue', sans-serif"
-        letterSpacing="0.03em"
-      >
-        MOTORCYCLE
-      </text>
     </svg>
   );
 }
 
 export function PlateIconJDM({
-  size = 32,
+  size = 24,
   className = '',
-  fill = defaultProps.fill,
-  stroke = defaultProps.stroke,
-  labelColor = defaultProps.labelColor,
+  color = '#6B7280',
+  strokeWidth = 1.5,
 }: PlateFormatIconProps) {
   const width = size * 2;
   const height = size;
-  const radius = height * 0.06;
-  const borderPadding = height * 0.05;
-  const borderWidth = height * 0.02;
+  const radius = height * 0.1;
+  const padding = strokeWidth / 2;
 
   return (
     <svg
@@ -355,37 +219,16 @@ export function PlateIconJDM({
       xmlns="http://www.w3.org/2000/svg"
     >
       <rect
-        x="0"
-        y="0"
-        width={width}
-        height={height}
+        x={padding}
+        y={padding}
+        width={width - strokeWidth}
+        height={height - strokeWidth}
         rx={radius}
         ry={radius}
-        fill={fill}
-      />
-      <rect
-        x={borderPadding}
-        y={borderPadding}
-        width={width - borderPadding * 2}
-        height={height - borderPadding * 2}
-        rx={radius - borderPadding / 2}
-        ry={radius - borderPadding / 2}
         fill="none"
-        stroke={stroke}
-        strokeWidth={borderWidth}
+        stroke={color}
+        strokeWidth={strokeWidth}
       />
-      <text
-        x={width / 2}
-        y={height / 2}
-        textAnchor="middle"
-        dominantBaseline="middle"
-        fill={labelColor}
-        fontSize={height * 0.36}
-        fontFamily="var(--font-bebas-neue), 'Bebas Neue', sans-serif"
-        letterSpacing="0.08em"
-      >
-        JDM
-      </text>
     </svg>
   );
 }
@@ -393,13 +236,12 @@ export function PlateIconJDM({
 // Unified component that renders the appropriate icon based on plate type
 export function PlateFormatIcon({
   type,
-  size = 32,
+  size = 24,
   className = '',
-  fill,
-  stroke,
-  labelColor,
+  color,
+  strokeWidth,
 }: PlateFormatIconProps & { type: string }) {
-  const props = { size, className, fill, stroke, labelColor };
+  const props = { size, className, color, strokeWidth };
 
   switch (type) {
     case 'standard':
