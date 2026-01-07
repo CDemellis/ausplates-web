@@ -1,4 +1,5 @@
 import { AustralianState, PlateColorScheme, getColorSchemeColors } from '@/types/listing';
+import { PlateTemplateVIC } from './PlateTemplateVIC';
 
 interface PlateViewProps {
   combination: string;
@@ -8,7 +9,15 @@ interface PlateViewProps {
   className?: string;
 }
 
-const sizeStyles = {
+// Map PlateView sizes to template sizes
+const sizeMap = {
+  small: 'small' as const,
+  medium: 'medium' as const,
+  large: 'large' as const,
+};
+
+// Fallback styles for states without templates yet
+const fallbackSizeStyles = {
   small: {
     container: 'h-11 px-4',
     state: 'text-[10px]',
@@ -36,7 +45,20 @@ export function PlateView({
   colorScheme,
   className = ''
 }: PlateViewProps) {
-  const styles = sizeStyles[size];
+  // Use state-specific template if available
+  if (state === 'VIC') {
+    return (
+      <PlateTemplateVIC
+        combination={combination}
+        colorScheme={colorScheme}
+        size={sizeMap[size]}
+        className={className}
+      />
+    );
+  }
+
+  // Fallback for states without templates yet
+  const styles = fallbackSizeStyles[size];
   const colors = getColorSchemeColors(colorScheme);
   const isLightBackground = LIGHT_BACKGROUNDS.includes(colors.background.toUpperCase());
 
@@ -69,7 +91,7 @@ export function PlateView({
         `}
         style={{
           color: colors.text,
-          fontFamily: 'system-ui, -apple-system, sans-serif',
+          fontFamily: "var(--font-bebas-neue), 'Bebas Neue', sans-serif",
         }}
       >
         {combination}
