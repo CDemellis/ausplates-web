@@ -7,7 +7,6 @@ import {
   formatTimeAgo,
   STATE_NAMES,
   PLATE_TYPE_NAMES,
-  getColorSchemeColors,
 } from '@/types/listing';
 import { PlateFeatureTags } from '@/components/PlateFeatureTags';
 import { PlateView } from '@/components/PlateView';
@@ -16,18 +15,14 @@ interface PageProps {
   params: Promise<{ slug: string }>;
 }
 
-// Light backgrounds need a dark container for visibility
-const LIGHT_BACKGROUNDS = ['#FFFFFF', '#FFD100', '#F5F5F5'];
+// Consistent light gray container for all plates
+const CONTAINER_COLOR = '#F0F0F0';
 
 function PlateHero({ listing }: { listing: any }) {
-  const colors = getColorSchemeColors(listing.colorScheme);
-  const isLightBackground = LIGHT_BACKGROUNDS.includes(colors.background.toUpperCase());
-  const containerColor = isLightBackground ? '#1A1A2E' : '#F0F0F0';
-
   return (
     <div
       className="rounded-2xl p-8 md:p-12 flex flex-col items-center justify-center min-h-[300px]"
-      style={{ backgroundColor: containerColor }}
+      style={{ backgroundColor: CONTAINER_COLOR }}
     >
       {listing.isFeatured && (
         <span className="inline-flex items-center gap-1 px-2 py-1 mb-6 bg-[var(--gold)] text-[var(--text)] text-xs font-semibold tracking-wide rounded">

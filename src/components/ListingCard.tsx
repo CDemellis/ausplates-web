@@ -1,23 +1,15 @@
 import Link from 'next/link';
-import { Listing, formatPrice, formatTimeAgo, getColorSchemeColors } from '@/types/listing';
+import { Listing, formatPrice, formatTimeAgo } from '@/types/listing';
 import { PlateView } from './PlateView';
 
 interface ListingCardProps {
   listing: Listing;
 }
 
-// Light backgrounds need a dark container for visibility
-const LIGHT_BACKGROUNDS = ['#FFFFFF', '#FFD100', '#F5F5F5'];
-
-function getContainerColor(colorScheme?: string): string {
-  const colors = getColorSchemeColors(colorScheme as any);
-  const isLightBackground = LIGHT_BACKGROUNDS.includes(colors.background.toUpperCase());
-  return isLightBackground ? '#1A1A2E' : '#F0F0F0';
-}
+// Consistent light gray container for all plates
+const CONTAINER_COLOR = '#F0F0F0';
 
 export function ListingCard({ listing }: ListingCardProps) {
-  const containerColor = getContainerColor(listing.colorScheme);
-
   return (
     <Link
       href={`/plate/${listing.slug}`}
@@ -27,7 +19,7 @@ export function ListingCard({ listing }: ListingCardProps) {
       <div className="relative p-3">
         <div
           className="rounded-xl aspect-[3/2] flex items-center justify-center"
-          style={{ backgroundColor: containerColor }}
+          style={{ backgroundColor: CONTAINER_COLOR }}
         >
           <PlateView
             combination={listing.combination}
