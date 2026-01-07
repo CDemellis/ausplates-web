@@ -202,29 +202,58 @@ interface PlateFeatureTagsProps {
 export function PlateFeatureTags({ listing, className = '' }: PlateFeatureTagsProps) {
   const colors = listing.colorScheme ? getColorSchemeColors(listing.colorScheme) : null;
 
-  // Group formats to show "2x Standard" or individual tags
-  const formatCounts = listing.sizeFormats?.reduce((acc, format) => {
-    acc[format] = (acc[format] || 0) + 1;
-    return acc;
-  }, {} as Record<PlateSizeFormat, number>) || {};
+  // Get front and rear formats
+  const frontFormat = listing.sizeFormats?.[0];
+  const rearFormat = listing.sizeFormats?.[1];
+  const sameFormat = frontFormat && rearFormat && frontFormat === rearFormat;
 
   return (
     <div className={`flex flex-wrap gap-2 ${className}`}>
       {/* Size format tags with plate icons */}
-      {Object.entries(formatCounts).map(([format, count]) => (
+      {sameFormat ? (
+        // Both plates same format - show "2x Standard"
         <PlateFeatureTag
-          key={format}
           icon={
             <PlateFormatIcon
-              type={getSizeFormatIconType(format as PlateSizeFormat)}
+              type={getSizeFormatIconType(frontFormat)}
               size={14}
               color="currentColor"
               strokeWidth={1}
             />
           }
-          label={count > 1 ? `${count}x ${SIZE_FORMAT_NAMES[format as PlateSizeFormat]}` : SIZE_FORMAT_NAMES[format as PlateSizeFormat]}
+          label={`2x ${SIZE_FORMAT_NAMES[frontFormat]}`}
         />
-      ))}
+      ) : (
+        // Different formats - show "Front: X" and "Rear: Y"
+        <>
+          {frontFormat && (
+            <PlateFeatureTag
+              icon={
+                <PlateFormatIcon
+                  type={getSizeFormatIconType(frontFormat)}
+                  size={14}
+                  color="currentColor"
+                  strokeWidth={1}
+                />
+              }
+              label={`Front: ${SIZE_FORMAT_NAMES[frontFormat]}`}
+            />
+          )}
+          {rearFormat && (
+            <PlateFeatureTag
+              icon={
+                <PlateFormatIcon
+                  type={getSizeFormatIconType(rearFormat)}
+                  size={14}
+                  color="currentColor"
+                  strokeWidth={1}
+                />
+              }
+              label={`Rear: ${SIZE_FORMAT_NAMES[rearFormat]}`}
+            />
+          )}
+        </>
+      )}
 
       {/* Color scheme tag with dual swatch */}
       {listing.colorScheme && colors && (
