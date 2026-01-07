@@ -251,7 +251,7 @@ export function PlateFeatureTags({ listing, className = '' }: PlateFeatureTagsPr
       {/* Character count tag */}
       {listing.characterCount && (
         <PlateFeatureTag
-          icon={<CharCountIcon />}
+          icon={null}
           label={`${listing.characterCount} Letters`}
         />
       )}
