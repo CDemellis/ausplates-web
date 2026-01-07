@@ -86,6 +86,8 @@ export type PlateSizeFormat =
   | 'jdm'
   | 'motorcycle';
 
+export type VehicleType = 'car' | 'motorcycle' | 'trailer';
+
 export interface Listing {
   id: string;
   slug: string;
@@ -102,6 +104,7 @@ export interface Listing {
   colorScheme?: PlateColorScheme;
   sizeFormat?: PlateSizeFormat;
   material?: PlateMaterial;
+  vehicleType?: VehicleType;
   teamName?: string; // For AFL/NRL branded plates
   isDiscontinuedStyle?: boolean; // Plate style no longer available new
   characterCount?: number; // Auto-calculated character count
@@ -155,6 +158,16 @@ export const PLATE_MATERIAL_NAMES: Record<PlateMaterial, string> = {
   acrylic: 'Acrylic',
   polycarbonate: 'Polycarbonate',
   enamel: 'Enamel',
+};
+
+export const SIZE_FORMAT_NAMES: Record<PlateSizeFormat, string> = {
+  standard: 'Standard',
+  slimline: 'Slimline',
+  euro: 'Euro',
+  square: 'Square',
+  us_style: 'US Style',
+  jdm: 'JDM',
+  motorcycle: 'Motorcycle',
 };
 
 // Color scheme to hex color mapping

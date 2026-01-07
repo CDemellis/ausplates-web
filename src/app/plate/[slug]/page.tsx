@@ -9,6 +9,7 @@ import {
   PLATE_TYPE_NAMES,
   getColorSchemeColors,
 } from '@/types/listing';
+import { PlateFeatureTags } from '@/components/PlateFeatureTags';
 
 interface PageProps {
   params: Promise<{ slug: string }>;
@@ -205,8 +206,8 @@ export default async function ListingDetailPage({ params }: PageProps) {
                 )}
               </div>
 
-              {/* Badges */}
-              <div className="flex flex-wrap gap-2 mb-6">
+              {/* Primary Badges */}
+              <div className="flex flex-wrap gap-2 mb-4">
                 <span className="px-3 py-1 bg-[var(--background-subtle)] text-[var(--text-secondary)] text-sm rounded-lg">
                   {STATE_NAMES[listing.state]}
                 </span>
@@ -214,6 +215,9 @@ export default async function ListingDetailPage({ params }: PageProps) {
                   {PLATE_TYPE_NAMES[listing.plateType]}
                 </span>
               </div>
+
+              {/* Feature Tags */}
+              <PlateFeatureTags listing={listing} className="mb-6" />
 
               {/* Description */}
               {listing.description && (
