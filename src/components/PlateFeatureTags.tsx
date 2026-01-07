@@ -202,22 +202,29 @@ interface PlateFeatureTagsProps {
 export function PlateFeatureTags({ listing, className = '' }: PlateFeatureTagsProps) {
   const colors = listing.colorScheme ? getColorSchemeColors(listing.colorScheme) : null;
 
+  // Group formats to show "2x Standard" or individual tags
+  const formatCounts = listing.sizeFormats?.reduce((acc, format) => {
+    acc[format] = (acc[format] || 0) + 1;
+    return acc;
+  }, {} as Record<PlateSizeFormat, number>) || {};
+
   return (
     <div className={`flex flex-wrap gap-2 ${className}`}>
-      {/* Size format tag with plate icon */}
-      {listing.sizeFormat && (
+      {/* Size format tags with plate icons */}
+      {Object.entries(formatCounts).map(([format, count]) => (
         <PlateFeatureTag
+          key={format}
           icon={
             <PlateFormatIcon
-              type={getSizeFormatIconType(listing.sizeFormat)}
+              type={getSizeFormatIconType(format as PlateSizeFormat)}
               size={14}
               color="currentColor"
               strokeWidth={1}
             />
           }
-          label={SIZE_FORMAT_NAMES[listing.sizeFormat] || listing.sizeFormat}
+          label={count > 1 ? `${count}x ${SIZE_FORMAT_NAMES[format as PlateSizeFormat]}` : SIZE_FORMAT_NAMES[format as PlateSizeFormat]}
         />
-      )}
+      ))}
 
       {/* Color scheme tag with dual swatch */}
       {listing.colorScheme && colors && (

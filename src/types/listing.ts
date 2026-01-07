@@ -102,7 +102,7 @@ export interface Listing {
   viewsCount: number;
   sellerId: string;
   colorScheme?: PlateColorScheme;
-  sizeFormat?: PlateSizeFormat;
+  sizeFormats: PlateSizeFormat[];
   material?: PlateMaterial;
   vehicleType?: VehicleType;
   teamName?: string; // For AFL/NRL branded plates
@@ -258,4 +258,13 @@ export function formatTimeAgo(dateString: string): string {
   if (diffDays < 30) return `${Math.floor(diffDays / 7)}w ago`;
   if (diffDays < 365) return `${Math.floor(diffDays / 30)}mo ago`;
   return `${Math.floor(diffDays / 365)}y ago`;
+}
+
+export function formatSizeFormats(formats: PlateSizeFormat[]): string {
+  if (formats.length === 0) return '';
+  if (formats.length === 1) return SIZE_FORMAT_NAMES[formats[0]];
+  if (formats.length === 2 && formats[0] === formats[1]) {
+    return `2x ${SIZE_FORMAT_NAMES[formats[0]]}`;
+  }
+  return `1x ${SIZE_FORMAT_NAMES[formats[0]]}, 1x ${SIZE_FORMAT_NAMES[formats[1]]}`;
 }
