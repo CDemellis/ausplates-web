@@ -10,6 +10,7 @@ import {
   getColorSchemeColors,
 } from '@/types/listing';
 import { PlateFeatureTags } from '@/components/PlateFeatureTags';
+import { PlateView } from '@/components/PlateView';
 
 interface PageProps {
   params: Promise<{ slug: string }>;
@@ -37,27 +38,13 @@ function PlateHero({ listing }: { listing: any }) {
         </span>
       )}
 
-      {/* The plate itself */}
-      <div
-        className="rounded-lg px-8 py-6 border-2 flex flex-col items-center"
-        style={{
-          backgroundColor: colors.background,
-          borderColor: isLightBackground ? '#E5E5E5' : colors.background,
-        }}
-      >
-        <p
-          className="text-sm font-semibold tracking-widest mb-1"
-          style={{ color: colors.text, opacity: 0.7 }}
-        >
-          {listing.state}
-        </p>
-        <h1
-          className="text-4xl md:text-5xl lg:text-6xl font-bold tracking-wider"
-          style={{ color: colors.text }}
-        >
-          {listing.combination}
-        </h1>
-      </div>
+      {/* The plate - using consistent PlateView component */}
+      <PlateView
+        combination={listing.combination}
+        state={listing.state}
+        colorScheme={listing.colorScheme}
+        size="xlarge"
+      />
     </div>
   );
 }

@@ -1,15 +1,9 @@
 'use client';
 
-import { PlateTemplateVIC } from '@/components/PlateTemplateVIC';
-import { PlateColorScheme } from '@/types/listing';
+import { PlateView } from '@/components/PlateView';
+import { PlateColorScheme, AustralianState } from '@/types/listing';
 import {
   PlateFormatIcon,
-  PlateIconStandard,
-  PlateIconSlimline,
-  PlateIconEuro,
-  PlateIconSquare,
-  PlateIconMotorcycle,
-  PlateIconJDM,
 } from '@/components/icons';
 
 const testCombinations = ['CUSTOM', 'LEGEND', 'BOSS', 'CEO', 'VIP', 'PLATES', '1'];
@@ -25,6 +19,8 @@ const colorSchemes: PlateColorScheme[] = [
   'afl_richmond',
   'afl_carlton',
 ];
+
+const australianStates: AustralianState[] = ['VIC', 'NSW', 'QLD', 'SA', 'WA', 'TAS', 'NT', 'ACT'];
 
 const plateFormats = ['standard', 'slimline', 'euro', 'square', 'motorcycle', 'jdm'];
 
@@ -97,25 +93,42 @@ export default function PlateDemoPage() {
         </div>
       </section>
 
-      {/* VIC Plate Template - Size variations */}
+      {/* All Australian States */}
+      <section className="mb-12">
+        <h2 className="text-xl font-semibold mb-4">All Australian States</h2>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+          {australianStates.map((state) => (
+            <div key={state} className="bg-white p-4 rounded-xl flex flex-col items-center">
+              <PlateView
+                combination="PLATES"
+                state={state}
+                size="medium"
+              />
+              <p className="text-sm text-gray-600 mt-2 font-medium">{state}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* Size Variations */}
       <section className="mb-12">
         <h2 className="text-xl font-semibold mb-4">Size Variations</h2>
         <div className="flex flex-wrap items-end gap-6 bg-white p-6 rounded-xl">
           <div className="text-center">
-            <PlateTemplateVIC combination="CUSTOM" size="small" />
-            <p className="text-sm text-gray-500 mt-2">Small</p>
+            <PlateView combination="CUSTOM" state="VIC" size="small" />
+            <p className="text-sm text-gray-500 mt-2">Small (122x44)</p>
           </div>
           <div className="text-center">
-            <PlateTemplateVIC combination="CUSTOM" size="medium" />
-            <p className="text-sm text-gray-500 mt-2">Medium</p>
+            <PlateView combination="CUSTOM" state="VIC" size="medium" />
+            <p className="text-sm text-gray-500 mt-2">Medium (194x70)</p>
           </div>
           <div className="text-center">
-            <PlateTemplateVIC combination="CUSTOM" size="large" />
-            <p className="text-sm text-gray-500 mt-2">Large</p>
+            <PlateView combination="CUSTOM" state="VIC" size="large" />
+            <p className="text-sm text-gray-500 mt-2">Large (280x100)</p>
           </div>
           <div className="text-center">
-            <PlateTemplateVIC combination="CUSTOM" size="xlarge" />
-            <p className="text-sm text-gray-500 mt-2">XLarge</p>
+            <PlateView combination="CUSTOM" state="VIC" size="xlarge" />
+            <p className="text-sm text-gray-500 mt-2">XLarge (372x134)</p>
           </div>
         </div>
       </section>
@@ -125,9 +138,10 @@ export default function PlateDemoPage() {
         <h2 className="text-xl font-semibold mb-4">Color Schemes</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {colorSchemes.map((scheme) => (
-            <div key={scheme} className="bg-white p-4 rounded-xl">
-              <PlateTemplateVIC
+            <div key={scheme} className="bg-white p-4 rounded-xl flex flex-col items-center">
+              <PlateView
                 combination="LEGEND"
+                state="VIC"
                 colorScheme={scheme}
                 size="large"
               />
@@ -142,9 +156,10 @@ export default function PlateDemoPage() {
         <h2 className="text-xl font-semibold mb-4">Various Combinations</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {testCombinations.map((combo) => (
-            <div key={combo} className="bg-white p-4 rounded-xl">
-              <PlateTemplateVIC
+            <div key={combo} className="bg-white p-4 rounded-xl flex flex-col items-center">
+              <PlateView
                 combination={combo}
+                state="NSW"
                 size="large"
               />
               <p className="text-sm text-gray-600 mt-2">{combo}</p>
@@ -157,7 +172,7 @@ export default function PlateDemoPage() {
       <section className="mb-12">
         <h2 className="text-xl font-semibold mb-4">Full Width Preview</h2>
         <div className="bg-neutral-800 p-8 rounded-xl flex justify-center">
-          <PlateTemplateVIC combination="CUSTOM" size="xlarge" />
+          <PlateView combination="CUSTOM" state="VIC" size="xlarge" />
         </div>
       </section>
     </div>
