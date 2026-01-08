@@ -625,14 +625,13 @@ function Step5Review({
   error: string | null;
 }) {
   const listingFee = 999; // $9.99 in cents
-  const boost7Day = 999;
-  const boost30Day = 2499;
+  const boost7DayTotal = 1998; // $19.98 (listing + 7-day boost)
+  const boost30DayTotal = 2499; // $24.99 (listing + 30-day boost - best value)
 
   const getTotal = () => {
-    let total = listingFee;
-    if (draft.boostType === '7day') total += boost7Day;
-    if (draft.boostType === '30day') total += boost30Day;
-    return total;
+    if (draft.boostType === '7day') return boost7DayTotal;
+    if (draft.boostType === '30day') return boost30DayTotal;
+    return listingFee;
   };
 
   return (
@@ -737,9 +736,9 @@ function Step5Review({
                 />
                 <div className="flex-1">
                   <p className="font-medium text-[var(--text)]">30-Day Boost</p>
-                  <p className="text-sm text-[var(--text-muted)]">Featured for 30 days, priority placement</p>
+                  <p className="text-sm text-[var(--text-muted)]">Listing fee + 30 days featured, priority placement</p>
                 </div>
-                <span className="font-medium text-[var(--text)]">+$24.99</span>
+                <span className="font-medium text-[var(--text)]">$24.99</span>
               </label>
             </div>
           </div>
@@ -989,18 +988,6 @@ export default function CreateListingPage() {
     );
   }
 
-  // Payment confirmation in progress - full screen overlay
-  if (isConfirmingPayment) {
-    return (
-      <div className="min-h-screen bg-[var(--background)] flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-16 h-16 border-4 border-[var(--green)] border-t-transparent rounded-full animate-spin mx-auto mb-6" />
-          <h2 className="text-xl font-semibold text-[var(--text)] mb-2">Payment Successful!</h2>
-          <p className="text-[var(--text-secondary)]">Publishing your listing...</p>
-        </div>
-      </div>
-    );
-  }
 
   // Not authenticated
   if (!isAuthenticated) {
@@ -1088,6 +1075,26 @@ export default function CreateListingPage() {
       <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-[var(--border)] p-4">
         <StickyPlatePreview draft={draft} />
       </div>
+
+      {/* Payment Success Modal */}
+      {isConfirmingPayment && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          {/* Backdrop */}
+          <div className="absolute inset-0 bg-black/50" />
+
+          {/* Modal */}
+          <div className="relative bg-white rounded-2xl p-8 max-w-sm w-full text-center shadow-xl">
+            <div className="w-16 h-16 bg-[var(--green)]/10 rounded-full flex items-center justify-center mx-auto mb-4">
+              <svg className="w-8 h-8 text-[var(--green)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+            </div>
+            <h2 className="text-xl font-semibold text-[var(--text)] mb-2">Payment Successful!</h2>
+            <p className="text-[var(--text-secondary)] mb-4">Publishing your listing...</p>
+            <div className="w-8 h-8 border-3 border-[var(--green)] border-t-transparent rounded-full animate-spin mx-auto" />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
