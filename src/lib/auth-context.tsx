@@ -21,6 +21,7 @@ interface AuthContextType {
   signOut: () => Promise<void>;
   refreshUser: () => Promise<void>;
   setUserFromSignIn: (user: User, session: Session) => void;
+  getAccessToken: () => Promise<string | null>;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -102,6 +103,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(newUser);
   };
 
+  const getAccessToken = async (): Promise<string | null> => {
+    const { accessToken, refreshToken } = getTokens();
+
+    if (!accessToken) {
+      return null;
+    }
+
+    // Check if token might be expired (we don't have expiry info here, so just return it)
+    // The API calls will fail and we can handle refresh there if needed
+    return accessToken;
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -112,6 +125,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         signOut,
         refreshUser,
         setUserFromSignIn,
+        getAccessToken,
       }}
     >
       {children}

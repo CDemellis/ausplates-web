@@ -1,10 +1,15 @@
 import { Metadata } from 'next';
+import { Suspense } from 'react';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { ListingCard } from '@/components/ListingCard';
-import { getListingsByState } from '@/lib/api';
+import { FilterPanel } from '@/components/FilterPanel';
+import { getListings } from '@/lib/api';
 import {
   AustralianState,
+  PlateType,
+  PlateColorScheme,
+  PlateSizeFormat,
   STATE_NAMES,
   Listing,
 } from '@/types/listing';
@@ -32,6 +37,15 @@ const STATE_DESCRIPTIONS: Record<AustralianState, string> = {
 
 interface PageProps {
   params: Promise<{ state: string }>;
+  searchParams?: Promise<{
+    query?: string;
+    plate_types?: string;
+    color_schemes?: string;
+    size_formats?: string;
+    min_price?: string;
+    max_price?: string;
+    sort?: string;
+  }>;
 }
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
@@ -60,7 +74,15 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   };
 }
 
-export default async function StatePlatesPage({ params }: PageProps) {
+function FilterPanelWrapper({ fixedState }: { fixedState: AustralianState }) {
+  return (
+    <Suspense fallback={<div className="bg-white rounded-xl border border-[var(--border)] p-4 animate-pulse h-96" />}>
+      <FilterPanel fixedState={fixedState} />
+    </Suspense>
+  );
+}
+
+export default async function StatePlatesPage({ params, searchParams: searchParamsPromise }: PageProps) {
   const { state } = await params;
   const stateUpper = state.toUpperCase() as AustralianState;
 
@@ -69,9 +91,45 @@ export default async function StatePlatesPage({ params }: PageProps) {
   }
 
   const stateName = STATE_NAMES[stateUpper];
+  const searchParams = searchParamsPromise ? await searchParamsPromise : {};
 
-  // Fetch listings from API
-  const listings: Listing[] = await getListingsByState(stateUpper);
+  // Parse filter parameters
+  const query = searchParams.query;
+  const plateTypes = searchParams.plate_types?.split(',').filter(Boolean) as PlateType[] | undefined;
+  const colorSchemes = searchParams.color_schemes?.split(',').filter(Boolean) as PlateColorScheme[] | undefined;
+  const sizeFormats = searchParams.size_formats?.split(',').filter(Boolean) as PlateSizeFormat[] | undefined;
+  const minPrice = searchParams.min_price ? parseInt(searchParams.min_price, 10) : undefined;
+  const maxPrice = searchParams.max_price ? parseInt(searchParams.max_price, 10) : undefined;
+  const sort = (searchParams.sort || 'recent') as 'recent' | 'price_asc' | 'price_desc' | 'views';
+
+  // Fetch listings from API with state fixed + other filters
+  let listings: Listing[] = [];
+  let total = 0;
+
+  try {
+    const response = await getListings({
+      state: stateUpper,
+      query,
+      plateTypes,
+      colorSchemes,
+      sizeFormats,
+      minPrice,
+      maxPrice,
+      pageSize: 24,
+      sort,
+    });
+    listings = response?.listings || [];
+    total = response?.total || 0;
+  } catch (error) {
+    console.error('Failed to fetch listings:', error);
+  }
+
+  // Count active filters (excluding state since it's fixed)
+  const activeFilterCount =
+    (plateTypes?.length || 0) +
+    (colorSchemes?.length || 0) +
+    (sizeFormats?.length || 0) +
+    (minPrice || maxPrice ? 1 : 0);
 
   // JSON-LD for state page
   const jsonLd = {
@@ -106,7 +164,7 @@ export default async function StatePlatesPage({ params }: PageProps) {
                 {stateName} Number Plates
               </h1>
               <p className="text-lg text-gray-400 max-w-2xl mx-auto">
-                Browse personalised plates for sale in {stateName}
+                {query ? `Search: "${query}"` : `Browse personalised plates for sale in ${stateName}`}
               </p>
             </div>
           </div>
@@ -127,78 +185,121 @@ export default async function StatePlatesPage({ params }: PageProps) {
           </nav>
         </div>
 
-        {/* Stats Bar */}
-        <div className="border-b border-[var(--border)]">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-            <p className="text-[var(--text-secondary)]">
-              <span className="font-semibold text-[var(--text)]">{listings.length}</span> plates
-              available in {stateUpper}
-            </p>
-          </div>
-        </div>
-
-        {/* Listings Grid */}
+        {/* Main Content with Filters */}
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          {listings.length > 0 ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              {listings.map((listing) => (
-                <ListingCard key={listing.id} listing={listing} />
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-16">
-              <svg
-                className="w-16 h-16 mx-auto text-[var(--text-muted)] mb-4"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={1.5}
-                  d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                />
-              </svg>
-              <h3 className="text-lg font-medium text-[var(--text)] mb-2">
-                No {stateUpper} plates listed yet
-              </h3>
-              <p className="text-[var(--text-muted)] mb-6">
-                Be the first to list a {stateName} plate
-              </p>
-              <Link
-                href="https://apps.apple.com/app/ausplates"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-[var(--green)] text-white font-medium rounded-xl hover:bg-[#006B31] transition-colors"
-              >
-                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z" />
-                </svg>
-                List Your Plate
-              </Link>
-            </div>
-          )}
+          <div className="lg:grid lg:grid-cols-4 lg:gap-8">
+            {/* Sidebar Filters - Desktop */}
+            <aside className="hidden lg:block lg:col-span-1">
+              <div className="sticky top-24">
+                <FilterPanelWrapper fixedState={stateUpper} />
+              </div>
+            </aside>
 
-          {/* App CTA */}
-          {listings.length > 0 && (
-            <div className="mt-12 text-center">
-              <p className="text-[var(--text-muted)] mb-4">
-                Get the app for instant notifications when new {stateUpper} plates are listed
-              </p>
-              <Link
-                href="https://apps.apple.com/app/ausplates"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-[var(--green)] text-white font-medium rounded-xl hover:bg-[#006B31] transition-colors"
-              >
-                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z" />
-                </svg>
-                Get the App
-              </Link>
+            {/* Mobile Filter Toggle & Results */}
+            <div className="lg:col-span-3">
+              {/* Mobile Filter Button */}
+              <div className="lg:hidden mb-6">
+                <details className="group">
+                  <summary className="flex items-center justify-between w-full px-4 py-3 bg-white border border-[var(--border)] rounded-xl cursor-pointer list-none">
+                    <span className="flex items-center gap-2 font-medium text-[var(--text)]">
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+                      </svg>
+                      Filters
+                      {activeFilterCount > 0 && (
+                        <span className="inline-flex items-center justify-center w-5 h-5 text-xs font-bold text-white bg-[var(--green)] rounded-full">
+                          {activeFilterCount}
+                        </span>
+                      )}
+                    </span>
+                    <svg className="w-5 h-5 text-[var(--text-muted)] transition-transform group-open:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </summary>
+                  <div className="mt-4">
+                    <FilterPanelWrapper fixedState={stateUpper} />
+                  </div>
+                </details>
+              </div>
+
+              {/* Results Count - with live region for screen readers */}
+              <div className="flex items-center justify-between mb-6">
+                <p className="text-sm text-[var(--text-muted)]">
+                  {total > 0
+                    ? `Showing ${listings.length} of ${total.toLocaleString()} ${stateUpper} plates`
+                    : `No ${stateUpper} plates found`}
+                  {activeFilterCount > 0 && ` (${activeFilterCount} filter${activeFilterCount !== 1 ? 's' : ''} applied)`}
+                </p>
+                {/* Live region for screen reader announcements */}
+                <div className="sr-only" role="status" aria-live="polite" aria-atomic="true">
+                  {total > 0
+                    ? `${total} ${stateUpper} plates found. Showing ${listings.length} results.`
+                    : `No ${stateUpper} plates found matching your filters.`}
+                </div>
+              </div>
+
+              {/* Listings Grid */}
+              {listings.length > 0 ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
+                  {listings.map((listing) => (
+                    <ListingCard key={listing.id} listing={listing} />
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-16 bg-white rounded-xl border border-[var(--border)]">
+                  <svg
+                    className="w-16 h-16 mx-auto text-[var(--text-muted)] mb-4"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={1.5}
+                      d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                    />
+                  </svg>
+                  <h3 className="text-lg font-medium text-[var(--text)] mb-2">
+                    No {stateUpper} plates found
+                  </h3>
+                  <p className="text-[var(--text-muted)] mb-6 max-w-md mx-auto">
+                    {query || activeFilterCount > 0
+                      ? 'Try adjusting your search or filters'
+                      : `Be the first to list a ${stateName} plate`}
+                  </p>
+                  {(query || activeFilterCount > 0) && (
+                    <Link
+                      href={`/plates/${state}`}
+                      className="inline-flex items-center justify-center px-6 py-3 bg-[var(--green)] text-white font-medium rounded-xl hover:bg-[#006B31] transition-colors"
+                    >
+                      Clear Filters
+                    </Link>
+                  )}
+                </div>
+              )}
+
+              {/* App CTA */}
+              {listings.length > 0 && (
+                <div className="mt-12 text-center">
+                  <p className="text-[var(--text-muted)] mb-4">
+                    Get the app for instant notifications when new {stateUpper} plates are listed
+                  </p>
+                  <Link
+                    href="https://apps.apple.com/app/ausplates"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-[var(--green)] text-white font-medium rounded-xl hover:bg-[#006B31] transition-colors"
+                  >
+                    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z" />
+                    </svg>
+                    Get the App
+                  </Link>
+                </div>
+              )}
             </div>
-          )}
+          </div>
         </div>
 
         {/* Other States */}

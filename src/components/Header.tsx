@@ -1,10 +1,11 @@
 'use client';
 
+import { Suspense } from 'react';
 import Link from 'next/link';
 import { MobileMenu } from './MobileMenu';
+import { SearchBar } from './SearchBar';
+import { MessagesIcon } from './MessagesIcon';
 import { useAuth } from '@/lib/auth-context';
-
-const STATES = ['VIC', 'NSW', 'QLD', 'SA', 'WA', 'TAS', 'NT', 'ACT'] as const;
 
 export function Header() {
   const { user, isAuthenticated, isLoading } = useAuth();
@@ -13,35 +14,41 @@ export function Header() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
-          <Link href="/" className="flex items-center gap-0">
+          <Link href="/" className="flex-shrink-0 flex items-center gap-0">
             <span className="text-xl font-semibold text-[var(--text)]">Aus</span>
             <span className="text-xl font-semibold text-[var(--green)]">Plates</span>
           </Link>
 
+          {/* Search Bar - Desktop */}
+          <div className="hidden md:block flex-1 max-w-md mx-6">
+            <Suspense fallback={<div className="h-10 bg-[var(--background-subtle)] rounded-xl animate-pulse" />}>
+              <SearchBar compact placeholder="Search plates..." />
+            </Suspense>
+          </div>
+
           {/* Navigation - Desktop */}
-          <nav className="hidden md:flex items-center gap-6">
+          <nav className="hidden md:flex items-center gap-2">
             <Link
               href="/plates"
-              className="text-sm font-medium text-[var(--text-secondary)] hover:text-[var(--text)] transition-colors"
+              className="px-3 py-2 text-sm font-medium text-[var(--text-secondary)] hover:text-[var(--text)] hover:bg-gray-100 rounded-lg transition-colors"
             >
               Browse
             </Link>
-            <div className="h-4 w-px bg-[var(--border)]" />
-            {STATES.map((state) => (
-              <Link
-                key={state}
-                href={`/plates/${state.toLowerCase()}`}
-                className="text-sm font-medium text-[var(--text-secondary)] hover:text-[var(--green)] transition-colors"
-              >
-                {state}
-              </Link>
-            ))}
           </nav>
 
           {/* CTA / User Menu */}
           <div className="flex items-center gap-4">
             {!isLoading && isAuthenticated && user ? (
               <>
+                <Link
+                  href="/create"
+                  className="hidden md:inline-flex items-center gap-1.5 px-4 py-2 bg-[var(--green)] text-white text-sm font-medium rounded-xl hover:bg-[#006B31] transition-colors"
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                  </svg>
+                  Sell
+                </Link>
                 <Link
                   href="/saved"
                   className="hidden md:flex items-center gap-1.5 px-3 py-2 rounded-xl text-[var(--text-secondary)] hover:text-[var(--text)] hover:bg-gray-100 transition-colors"
@@ -51,6 +58,7 @@ export function Header() {
                   </svg>
                   <span className="text-sm font-medium">Saved</span>
                 </Link>
+                <MessagesIcon className="hidden md:flex" />
                 <Link
                   href="/profile"
                   className="hidden md:flex items-center gap-2 px-3 py-2 rounded-xl hover:bg-gray-100 transition-colors"

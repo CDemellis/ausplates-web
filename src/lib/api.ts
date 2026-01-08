@@ -1,4 +1,4 @@
-import { Listing, ListingWithSeller, AustralianState, PlateColorScheme, PlateSizeFormat } from '@/types/listing';
+import { Listing, ListingWithSeller, AustralianState, PlateType, PlateColorScheme, PlateSizeFormat } from '@/types/listing';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://ausplates.onrender.com';
 
@@ -84,13 +84,23 @@ function transformListingWithSeller(api: APIListing): ListingWithSeller {
 interface ListingsParams {
   page?: number;
   pageSize?: number;
+  // Single state (legacy) or multiple states
   state?: AustralianState;
+  states?: AustralianState[];
   minPrice?: number;
   maxPrice?: number;
+  // Single plate type (legacy) or multiple
   plateType?: string;
-  search?: string;
+  plateTypes?: PlateType[];
+  // Color schemes
+  colorSchemes?: PlateColorScheme[];
+  // Size formats
+  sizeFormats?: PlateSizeFormat[];
+  // Search query
+  query?: string;
+  search?: string; // Legacy alias for query
   featured?: boolean;
-  sort?: 'recent' | 'price_asc' | 'price_desc';
+  sort?: 'recent' | 'price_asc' | 'price_desc' | 'views';
 }
 
 export async function getListings(params: ListingsParams = {}): Promise<{ listings: Listing[]; total: number }> {
@@ -98,11 +108,39 @@ export async function getListings(params: ListingsParams = {}): Promise<{ listin
 
   if (params.page) searchParams.set('page', params.page.toString());
   if (params.pageSize) searchParams.set('pageSize', params.pageSize.toString());
-  if (params.state) searchParams.set('state', params.state);
+
+  // States - support both single and multiple
+  if (params.states && params.states.length > 0) {
+    searchParams.set('state', params.states.join(','));
+  } else if (params.state) {
+    searchParams.set('state', params.state);
+  }
+
+  // Price range
   if (params.minPrice) searchParams.set('minPrice', params.minPrice.toString());
   if (params.maxPrice) searchParams.set('maxPrice', params.maxPrice.toString());
-  if (params.plateType) searchParams.set('plateType', params.plateType);
-  if (params.search) searchParams.set('search', params.search);
+
+  // Plate types - support both single and multiple
+  if (params.plateTypes && params.plateTypes.length > 0) {
+    searchParams.set('plateType', params.plateTypes.join(','));
+  } else if (params.plateType) {
+    searchParams.set('plateType', params.plateType);
+  }
+
+  // Color schemes
+  if (params.colorSchemes && params.colorSchemes.length > 0) {
+    searchParams.set('colorScheme', params.colorSchemes.join(','));
+  }
+
+  // Size formats
+  if (params.sizeFormats && params.sizeFormats.length > 0) {
+    searchParams.set('sizeFormats', params.sizeFormats.join(','));
+  }
+
+  // Search query
+  if (params.query) searchParams.set('query', params.query);
+  if (params.search) searchParams.set('query', params.search);
+
   if (params.featured) searchParams.set('featured', 'true');
   if (params.sort) searchParams.set('sort', params.sort);
 
@@ -260,4 +298,404 @@ export async function unsaveListing(accessToken: string, listingId: string): Pro
 export async function getSavedListingIds(accessToken: string): Promise<Set<string>> {
   const listings = await getSavedListings(accessToken);
   return new Set(listings.map(l => l.id));
+}
+
+// ============================================
+// MESSAGING API
+// ============================================
+
+export interface Message {
+  id: string;
+  conversationId: string;
+  senderId: string;
+  content: string;
+  createdAt: string;
+  isRead: boolean;
+}
+
+export interface ConversationParticipant {
+  id: string;
+  fullName: string;
+  avatarUrl?: string;
+}
+
+export interface ConversationListing {
+  id: string;
+  slug: string;
+  combination: string;
+  state: AustralianState;
+  price: number;
+}
+
+export interface Conversation {
+  id: string;
+  listingId: string;
+  listing: ConversationListing;
+  participants: ConversationParticipant[];
+  otherUser: ConversationParticipant;
+  lastMessage?: Message;
+  unreadCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ConversationDetail extends Conversation {
+  messages: Message[];
+}
+
+// API response types (snake_case from backend)
+interface APIMessage {
+  id: string;
+  conversation_id: string;
+  sender_id: string;
+  content: string;
+  created_at: string;
+  is_read: boolean;
+}
+
+interface APIConversationParticipant {
+  id: string;
+  full_name: string;
+  avatar_url?: string;
+}
+
+interface APIConversationListing {
+  id: string;
+  slug: string;
+  combination: string;
+  state: AustralianState;
+  price: number;
+}
+
+interface APIConversation {
+  id: string;
+  listing_id: string;
+  listing: APIConversationListing;
+  participants: APIConversationParticipant[];
+  other_user: APIConversationParticipant;
+  last_message?: APIMessage;
+  unread_count: number;
+  created_at: string;
+  updated_at: string;
+  messages?: APIMessage[];
+}
+
+// Transform functions
+function transformMessage(api: APIMessage): Message {
+  return {
+    id: api.id,
+    conversationId: api.conversation_id,
+    senderId: api.sender_id,
+    content: api.content,
+    createdAt: api.created_at,
+    isRead: api.is_read,
+  };
+}
+
+function transformParticipant(api: APIConversationParticipant): ConversationParticipant {
+  return {
+    id: api.id,
+    fullName: api.full_name,
+    avatarUrl: api.avatar_url,
+  };
+}
+
+function transformConversation(api: APIConversation): Conversation {
+  return {
+    id: api.id,
+    listingId: api.listing_id,
+    listing: {
+      id: api.listing.id,
+      slug: api.listing.slug,
+      combination: api.listing.combination,
+      state: api.listing.state,
+      price: api.listing.price,
+    },
+    participants: api.participants.map(transformParticipant),
+    otherUser: transformParticipant(api.other_user),
+    lastMessage: api.last_message ? transformMessage(api.last_message) : undefined,
+    unreadCount: api.unread_count,
+    createdAt: api.created_at,
+    updatedAt: api.updated_at,
+  };
+}
+
+function transformConversationDetail(api: APIConversation): ConversationDetail {
+  return {
+    ...transformConversation(api),
+    messages: (api.messages || []).map(transformMessage),
+  };
+}
+
+// Get all conversations for authenticated user
+export async function getConversations(accessToken: string): Promise<Conversation[]> {
+  const url = `${API_BASE_URL}/api/messages/conversations`;
+
+  const res = await fetch(url, {
+    headers: {
+      'Authorization': `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+  });
+
+  if (!res.ok) {
+    throw new Error('Failed to fetch conversations');
+  }
+
+  const data: { data: APIConversation[] } = await res.json();
+  return (data.data || []).map(transformConversation);
+}
+
+// Get single conversation with messages
+export async function getConversation(accessToken: string, conversationId: string): Promise<ConversationDetail> {
+  const url = `${API_BASE_URL}/api/messages/conversations/${conversationId}`;
+
+  const res = await fetch(url, {
+    headers: {
+      'Authorization': `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+  });
+
+  if (!res.ok) {
+    throw new Error('Failed to fetch conversation');
+  }
+
+  const data: { data: APIConversation } = await res.json();
+  return transformConversationDetail(data.data);
+}
+
+// Get messages for a conversation (for polling new messages)
+export async function getMessages(accessToken: string, conversationId: string, since?: string): Promise<Message[]> {
+  let url = `${API_BASE_URL}/api/messages/conversations/${conversationId}/messages`;
+  if (since) {
+    url += `?since=${encodeURIComponent(since)}`;
+  }
+
+  const res = await fetch(url, {
+    headers: {
+      'Authorization': `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+  });
+
+  if (!res.ok) {
+    throw new Error('Failed to fetch messages');
+  }
+
+  const data: { data: APIMessage[] } = await res.json();
+  return (data.data || []).map(transformMessage);
+}
+
+// Send a message
+export async function sendMessage(accessToken: string, conversationId: string, content: string): Promise<Message> {
+  const url = `${API_BASE_URL}/api/messages/conversations/${conversationId}/messages`;
+
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ content }),
+  });
+
+  if (!res.ok) {
+    throw new Error('Failed to send message');
+  }
+
+  const data: { data: APIMessage } = await res.json();
+  return transformMessage(data.data);
+}
+
+// Start a new conversation (contact seller)
+export async function startConversation(accessToken: string, listingId: string, message: string): Promise<Conversation> {
+  const url = `${API_BASE_URL}/api/messages/conversations`;
+
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ listingId, message }),
+  });
+
+  if (!res.ok) {
+    throw new Error('Failed to start conversation');
+  }
+
+  const data: { data: APIConversation } = await res.json();
+  return transformConversation(data.data);
+}
+
+// Get unread message count
+export async function getUnreadCount(accessToken: string): Promise<number> {
+  const url = `${API_BASE_URL}/api/messages/unread-count`;
+
+  const res = await fetch(url, {
+    headers: {
+      'Authorization': `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+  });
+
+  if (!res.ok) {
+    return 0; // Fail silently for unread count
+  }
+
+  const data: { count: number } = await res.json();
+  return data.count || 0;
+}
+
+// Mark conversation as read
+export async function markConversationRead(accessToken: string, conversationId: string): Promise<void> {
+  const url = `${API_BASE_URL}/api/messages/conversations/${conversationId}/read`;
+
+  await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+  });
+  // Ignore errors for marking read - not critical
+}
+
+// ============================================
+// LISTING CREATION API
+// ============================================
+
+export interface CreateListingData {
+  combination: string;
+  state: AustralianState;
+  plateType: string;
+  colorScheme: PlateColorScheme;
+  sizeFormats: [PlateSizeFormat, PlateSizeFormat];
+  material: string;
+  vehicleType: string;
+  price: number;
+  isOpenToOffers: boolean;
+  description: string;
+  photoUrls?: string[];
+}
+
+interface APICreateListingData {
+  combination: string;
+  state: AustralianState;
+  plate_type: string;
+  color_scheme: PlateColorScheme;
+  size_formats: [PlateSizeFormat, PlateSizeFormat];
+  material: string;
+  vehicle_type: string;
+  price: number;
+  is_open_to_offers: boolean;
+  description: string;
+  photo_urls?: string[];
+}
+
+// Create a new draft listing
+export async function createListing(accessToken: string, data: CreateListingData): Promise<{ id: string; slug: string }> {
+  const url = `${API_BASE_URL}/api/listings`;
+
+  const apiData: APICreateListingData = {
+    combination: data.combination,
+    state: data.state,
+    plate_type: data.plateType,
+    color_scheme: data.colorScheme,
+    size_formats: data.sizeFormats,
+    material: data.material,
+    vehicle_type: data.vehicleType,
+    price: data.price,
+    is_open_to_offers: data.isOpenToOffers,
+    description: data.description,
+    photo_urls: data.photoUrls,
+  };
+
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(apiData),
+  });
+
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({}));
+    throw new Error(error.error || 'Failed to create listing');
+  }
+
+  const listing = await res.json();
+  return { id: listing.id, slug: listing.slug };
+}
+
+// ============================================
+// PAYMENTS API
+// ============================================
+
+export interface CheckoutResponse {
+  checkoutUrl?: string;
+  sessionId?: string;
+  success?: boolean;
+  free?: boolean;
+  redirectUrl?: string;
+}
+
+// Create Stripe checkout session
+export async function createCheckout(
+  accessToken: string,
+  listingId: string,
+  boostType: 'none' | '7day' | '30day',
+  promoCode?: string
+): Promise<CheckoutResponse> {
+  const url = `${API_BASE_URL}/api/payments/create-checkout`;
+
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      listing_id: listingId,
+      boost_type: boostType,
+      promo_code: promoCode,
+    }),
+  });
+
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({}));
+    throw new Error(error.error || 'Failed to create checkout');
+  }
+
+  const data = await res.json();
+  return {
+    checkoutUrl: data.checkout_url,
+    sessionId: data.session_id,
+    success: data.success,
+    free: data.free,
+    redirectUrl: data.redirect_url,
+  };
+}
+
+// Get checkout session status
+export async function getCheckoutSession(sessionId: string): Promise<{ status: string; listingId?: string }> {
+  const url = `${API_BASE_URL}/api/payments/session/${sessionId}`;
+
+  const res = await fetch(url, {
+    headers: {
+      'Content-Type': 'application/json',
+    },
+  });
+
+  if (!res.ok) {
+    throw new Error('Failed to get session status');
+  }
+
+  const data = await res.json();
+  return {
+    status: data.status,
+    listingId: data.listing_id,
+  };
 }

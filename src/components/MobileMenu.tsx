@@ -67,6 +67,17 @@ export function MobileMenu() {
               {!isLoading && isAuthenticated && user ? (
                 <>
                   <Link
+                    href="/create"
+                    className="flex items-center justify-center gap-2 px-4 py-3 bg-[var(--green)] text-white font-medium rounded-xl hover:bg-[#006B31] transition-colors"
+                    onClick={() => setIsOpen(false)}
+                  >
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                    </svg>
+                    Sell Your Plate
+                  </Link>
+                  <div className="border-t border-[var(--border)] my-2" />
+                  <Link
                     href="/saved"
                     className="flex items-center gap-3 px-4 py-3 text-base font-medium text-[var(--text)] rounded-lg hover:bg-[var(--background-subtle)] transition-colors"
                     onClick={() => setIsOpen(false)}
@@ -77,6 +88,18 @@ export function MobileMenu() {
                       </svg>
                     </div>
                     <span>Saved Plates</span>
+                  </Link>
+                  <Link
+                    href="/messages"
+                    className="flex items-center gap-3 px-4 py-3 text-base font-medium text-[var(--text)] rounded-lg hover:bg-[var(--background-subtle)] transition-colors"
+                    onClick={() => setIsOpen(false)}
+                  >
+                    <div className="w-8 h-8 rounded-full bg-[var(--green)]/10 flex items-center justify-center">
+                      <svg className="w-5 h-5 text-[var(--green)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                      </svg>
+                    </div>
+                    <span>Messages</span>
                   </Link>
                   <Link
                     href="/profile"
