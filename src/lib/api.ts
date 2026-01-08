@@ -985,3 +985,55 @@ export async function deleteListing(
 
   return { success: true };
 }
+
+// Upload a photo to Supabase Storage
+export async function uploadPhoto(
+  accessToken: string,
+  file: File,
+  listingId?: string
+): Promise<{ url: string; path: string }> {
+  const url = `${API_BASE_URL}/api/storage/upload`;
+
+  const formData = new FormData();
+  formData.append('file', file);
+  if (listingId) {
+    formData.append('listing_id', listingId);
+  }
+
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${accessToken}`,
+    },
+    body: formData,
+  });
+
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({}));
+    throw new Error(error.error || 'Failed to upload photo');
+  }
+
+  return res.json();
+}
+
+// Delete a photo from Supabase Storage
+export async function deletePhoto(
+  accessToken: string,
+  path: string
+): Promise<{ success: boolean }> {
+  const url = `${API_BASE_URL}/api/storage/delete?path=${encodeURIComponent(path)}`;
+
+  const res = await fetch(url, {
+    method: 'DELETE',
+    headers: {
+      'Authorization': `Bearer ${accessToken}`,
+    },
+  });
+
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({}));
+    throw new Error(error.error || 'Failed to delete photo');
+  }
+
+  return { success: true };
+}

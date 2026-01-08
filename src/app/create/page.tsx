@@ -514,22 +514,36 @@ function Step4Photos({
   draft: ListingDraft;
   onChange: (updates: Partial<ListingDraft>) => void;
 }) {
+  const { getAccessToken } = useAuth();
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
-    // For now, just create object URLs (real implementation would upload to Supabase)
     setIsUploading(true);
+    setUploadError(null);
+
     try {
+      const token = await getAccessToken();
+      if (!token) throw new Error('Not authenticated');
+
+      const { uploadPhoto } = await import('@/lib/api');
       const newPhotos: string[] = [];
+
       for (const file of Array.from(files)) {
         if (draft.photos.length + newPhotos.length >= 5) break;
-        const url = URL.createObjectURL(file);
-        newPhotos.push(url);
+
+        // Upload to Supabase Storage
+        const result = await uploadPhoto(token, file);
+        newPhotos.push(result.url);
       }
+
       onChange({ photos: [...draft.photos, ...newPhotos] });
+    } catch (err) {
+      console.error('Upload error:', err);
+      setUploadError(err instanceof Error ? err.message : 'Failed to upload photo');
     } finally {
       setIsUploading(false);
     }
@@ -589,6 +603,10 @@ function Step4Photos({
             </label>
           )}
         </div>
+
+        {uploadError && (
+          <p className="text-sm text-red-500">{uploadError}</p>
+        )}
 
         <p className="text-sm text-[var(--text-muted)]">
           Photos help buyers see the actual condition. JPG or PNG, max 5MB each.
@@ -1020,8 +1038,7 @@ function CreateListingContent() {
         price: draft.price * 100, // Convert to cents
         isOpenToOffers: draft.isOpenToOffers,
         description: draft.description,
-        // TODO: Upload photos to Supabase and pass URLs
-        photoUrls: undefined,
+        photoUrls: draft.photos.length > 0 ? draft.photos : undefined,
       });
 
       // Store the listing slug for success redirect
