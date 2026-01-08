@@ -15,6 +15,7 @@ import { ContactSellerButton } from '@/components/ContactSellerButton';
 
 interface PageProps {
   params: Promise<{ slug: string }>;
+  searchParams: Promise<{ created?: string }>;
 }
 
 // Consistent light gray container for all plates
@@ -90,8 +91,10 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   };
 }
 
-export default async function ListingDetailPage({ params }: PageProps) {
+export default async function ListingDetailPage({ params, searchParams }: PageProps) {
   const { slug } = await params;
+  const { created } = await searchParams;
+  const isNewlyCreated = created === 'true';
 
   const listing = await getListingBySlug(slug);
 
@@ -131,6 +134,20 @@ export default async function ListingDetailPage({ params }: PageProps) {
       />
 
       <div className="bg-[var(--background)]">
+        {/* Success Banner for newly created listings */}
+        {isNewlyCreated && (
+          <div className="bg-[var(--green)] text-white">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
+              <div className="flex items-center justify-center gap-2">
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+                <p className="font-medium">Your plate is now listed! It&apos;s live and visible to buyers.</p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Breadcrumb */}
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <nav className="flex items-center gap-2 text-sm">
