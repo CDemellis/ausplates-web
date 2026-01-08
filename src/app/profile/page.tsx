@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { getTokens, getLinkingStatus, linkEmail, LinkingStatus } from '@/lib/auth';
-import { getSavedListings } from '@/lib/api';
+import { getSavedListings, getUserProfile, updateUserProfile, UserProfile, UpdateProfileData } from '@/lib/api';
 import { Listing } from '@/types/listing';
 import { ListingCard, ListingCardSkeleton } from '@/components/ListingCard';
 
@@ -141,6 +141,315 @@ function SavedPlatesSection() {
             {savedListings.slice(0, 4).map((listing) => (
               <ListingCard key={listing.id} listing={listing} />
             ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function EditProfileSection({ user, onUpdate }: { user: { fullName: string; avatarUrl?: string; email: string; emailVerified?: boolean }; onUpdate: () => void }) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+
+  // Form state
+  const [fullName, setFullName] = useState(user.fullName);
+  const [phoneNumber, setPhoneNumber] = useState('');
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+
+  // Notification preferences
+  const [notifications, setNotifications] = useState({
+    messages: true,
+    priceDrops: true,
+    newListings: false,
+    savedPlateUpdates: true,
+  });
+
+  useEffect(() => {
+    loadProfile();
+  }, []);
+
+  const loadProfile = async () => {
+    const { accessToken } = getTokens();
+    if (!accessToken) return;
+
+    try {
+      const data = await getUserProfile(accessToken);
+      setProfile(data);
+      setFullName(data.fullName);
+      setPhoneNumber(data.phoneNumber || '');
+      if (data.notificationPreferences) {
+        setNotifications(data.notificationPreferences);
+      }
+    } catch (err) {
+      console.error('Failed to load profile:', err);
+    }
+  };
+
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setSuccess('');
+
+    if (!fullName.trim()) {
+      setError('Name is required');
+      return;
+    }
+
+    const { accessToken } = getTokens();
+    if (!accessToken) return;
+
+    setIsSaving(true);
+    try {
+      const updateData: UpdateProfileData = {
+        fullName: fullName.trim(),
+        phoneNumber: phoneNumber.trim() || undefined,
+        notificationPreferences: notifications,
+      };
+
+      await updateUserProfile(accessToken, updateData);
+      setSuccess('Profile updated successfully');
+      setIsEditing(false);
+      onUpdate();
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleCancel = () => {
+    setIsEditing(false);
+    setError('');
+    setSuccess('');
+    // Reset to original values
+    if (profile) {
+      setFullName(profile.fullName);
+      setPhoneNumber(profile.phoneNumber || '');
+      if (profile.notificationPreferences) {
+        setNotifications(profile.notificationPreferences);
+      }
+    } else {
+      setFullName(user.fullName);
+    }
+  };
+
+  return (
+    <div className="bg-white rounded-2xl border border-[var(--border)] overflow-hidden">
+      <div className="px-6 py-4 border-b border-[var(--border)] flex items-center justify-between">
+        <div>
+          <h2 className="text-lg font-semibold text-[var(--text)]">Profile</h2>
+          <p className="text-sm text-[var(--text-muted)] mt-0.5">
+            Your personal information and preferences
+          </p>
+        </div>
+        {!isEditing && (
+          <button
+            onClick={() => setIsEditing(true)}
+            className="text-sm font-medium text-[var(--green)] hover:underline"
+          >
+            Edit
+          </button>
+        )}
+      </div>
+
+      <div className="p-6">
+        {error && (
+          <div className="bg-red-50 text-red-600 px-4 py-3 rounded-xl text-sm mb-4">
+            {error}
+          </div>
+        )}
+
+        {success && (
+          <div className="bg-green-50 text-green-600 px-4 py-3 rounded-xl text-sm flex items-center gap-2 mb-4">
+            <CheckIcon />
+            {success}
+          </div>
+        )}
+
+        {isEditing ? (
+          <form onSubmit={handleSave} className="space-y-6">
+            {/* Basic Info */}
+            <div className="space-y-4">
+              <div>
+                <label htmlFor="fullName" className="block text-sm font-medium text-[var(--text)] mb-1">
+                  Full Name
+                </label>
+                <input
+                  type="text"
+                  id="fullName"
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  required
+                  className="w-full px-4 py-3 rounded-xl border border-[var(--border)] focus:outline-none focus:ring-2 focus:ring-[var(--green)] focus:border-transparent"
+                  placeholder="Your full name"
+                />
+              </div>
+
+              <div>
+                <label htmlFor="email" className="block text-sm font-medium text-[var(--text)] mb-1">
+                  Email
+                </label>
+                <input
+                  type="email"
+                  id="email"
+                  value={user.email}
+                  disabled
+                  className="w-full px-4 py-3 rounded-xl border border-[var(--border)] bg-[var(--background-subtle)] text-[var(--text-muted)] cursor-not-allowed"
+                />
+                <p className="text-xs text-[var(--text-muted)] mt-1">Email cannot be changed</p>
+              </div>
+
+              <div>
+                <label htmlFor="phone" className="block text-sm font-medium text-[var(--text)] mb-1">
+                  Phone Number <span className="text-[var(--text-muted)]">(optional)</span>
+                </label>
+                <input
+                  type="tel"
+                  id="phone"
+                  value={phoneNumber}
+                  onChange={(e) => setPhoneNumber(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl border border-[var(--border)] focus:outline-none focus:ring-2 focus:ring-[var(--green)] focus:border-transparent"
+                  placeholder="0400 000 000"
+                />
+              </div>
+            </div>
+
+            {/* Notification Preferences */}
+            <div>
+              <h3 className="text-sm font-semibold text-[var(--text)] mb-3">Notification Preferences</h3>
+              <div className="space-y-3">
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={notifications.messages}
+                    onChange={(e) => setNotifications({ ...notifications, messages: e.target.checked })}
+                    className="w-5 h-5 rounded border-[var(--border)] text-[var(--green)] focus:ring-[var(--green)]"
+                  />
+                  <div>
+                    <span className="font-medium text-[var(--text)]">Messages</span>
+                    <p className="text-sm text-[var(--text-muted)]">Get notified when someone messages you</p>
+                  </div>
+                </label>
+
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={notifications.priceDrops}
+                    onChange={(e) => setNotifications({ ...notifications, priceDrops: e.target.checked })}
+                    className="w-5 h-5 rounded border-[var(--border)] text-[var(--green)] focus:ring-[var(--green)]"
+                  />
+                  <div>
+                    <span className="font-medium text-[var(--text)]">Price Drops</span>
+                    <p className="text-sm text-[var(--text-muted)]">Get notified about price drops on saved plates</p>
+                  </div>
+                </label>
+
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={notifications.savedPlateUpdates}
+                    onChange={(e) => setNotifications({ ...notifications, savedPlateUpdates: e.target.checked })}
+                    className="w-5 h-5 rounded border-[var(--border)] text-[var(--green)] focus:ring-[var(--green)]"
+                  />
+                  <div>
+                    <span className="font-medium text-[var(--text)]">Saved Plate Updates</span>
+                    <p className="text-sm text-[var(--text-muted)]">Get updates about plates you've saved</p>
+                  </div>
+                </label>
+
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={notifications.newListings}
+                    onChange={(e) => setNotifications({ ...notifications, newListings: e.target.checked })}
+                    className="w-5 h-5 rounded border-[var(--border)] text-[var(--green)] focus:ring-[var(--green)]"
+                  />
+                  <div>
+                    <span className="font-medium text-[var(--text)]">New Listings</span>
+                    <p className="text-sm text-[var(--text-muted)]">Get notified about new plates matching your interests</p>
+                  </div>
+                </label>
+              </div>
+            </div>
+
+            {/* Form Actions */}
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={handleCancel}
+                className="flex-1 py-3 px-4 rounded-xl border border-[var(--border)] font-medium text-[var(--text)] hover:bg-gray-100 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={isSaving}
+                className="flex-1 py-3 px-4 rounded-xl bg-[var(--green)] text-white font-medium hover:bg-[#006B31] transition-colors disabled:opacity-50"
+              >
+                {isSaving ? 'Saving...' : 'Save Changes'}
+              </button>
+            </div>
+          </form>
+        ) : (
+          <div className="space-y-4">
+            {/* Display Info */}
+            <div className="flex items-center gap-4">
+              {user.avatarUrl ? (
+                <img
+                  src={user.avatarUrl}
+                  alt={user.fullName}
+                  className="w-16 h-16 rounded-full object-cover"
+                />
+              ) : (
+                <div className="w-16 h-16 rounded-full bg-[var(--green)]/10 flex items-center justify-center">
+                  <span className="text-2xl font-semibold text-[var(--green)]">
+                    {user.fullName.charAt(0).toUpperCase()}
+                  </span>
+                </div>
+              )}
+              <div>
+                <h3 className="text-xl font-semibold text-[var(--text)]">{user.fullName}</h3>
+                <p className="text-[var(--text-muted)]">{user.email}</p>
+                {user.emailVerified && (
+                  <div className="flex items-center gap-1 mt-1 text-sm text-[var(--green)]">
+                    <CheckIcon />
+                    <span>Email verified</span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {profile?.phoneNumber && (
+              <div className="pt-3 border-t border-[var(--border)]">
+                <p className="text-sm text-[var(--text-muted)]">Phone</p>
+                <p className="text-[var(--text)]">{profile.phoneNumber}</p>
+              </div>
+            )}
+
+            {/* Notification Summary */}
+            <div className="pt-3 border-t border-[var(--border)]">
+              <p className="text-sm text-[var(--text-muted)] mb-2">Notifications</p>
+              <div className="flex flex-wrap gap-2">
+                {notifications.messages && (
+                  <span className="px-2 py-1 text-xs font-medium bg-[var(--green)]/10 text-[var(--green)] rounded-full">Messages</span>
+                )}
+                {notifications.priceDrops && (
+                  <span className="px-2 py-1 text-xs font-medium bg-[var(--green)]/10 text-[var(--green)] rounded-full">Price Drops</span>
+                )}
+                {notifications.savedPlateUpdates && (
+                  <span className="px-2 py-1 text-xs font-medium bg-[var(--green)]/10 text-[var(--green)] rounded-full">Saved Updates</span>
+                )}
+                {notifications.newListings && (
+                  <span className="px-2 py-1 text-xs font-medium bg-[var(--green)]/10 text-[var(--green)] rounded-full">New Listings</span>
+                )}
+                {!notifications.messages && !notifications.priceDrops && !notifications.savedPlateUpdates && !notifications.newListings && (
+                  <span className="text-sm text-[var(--text-muted)]">All notifications disabled</span>
+                )}
+              </div>
+            </div>
           </div>
         )}
       </div>
@@ -390,7 +699,7 @@ function AccountLinkingSection() {
 
 export default function ProfilePage() {
   const router = useRouter();
-  const { user, isLoading, isAuthenticated, signOut } = useAuth();
+  const { user, isLoading, isAuthenticated, signOut, refreshUser } = useAuth();
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
@@ -401,6 +710,13 @@ export default function ProfilePage() {
   const handleSignOut = async () => {
     await signOut();
     router.push('/');
+  };
+
+  const handleProfileUpdate = async () => {
+    // Refresh the auth context to pick up updated user data
+    if (refreshUser) {
+      await refreshUser();
+    }
   };
 
   if (isLoading) {
@@ -420,34 +736,8 @@ export default function ProfilePage() {
       <h1 className="text-2xl font-bold text-[var(--text)] mb-8">Profile & Settings</h1>
 
       <div className="space-y-6">
-        {/* User Info */}
-        <div className="bg-white rounded-2xl border border-[var(--border)] p-6">
-          <div className="flex items-center gap-4">
-            {user.avatarUrl ? (
-              <img
-                src={user.avatarUrl}
-                alt={user.fullName}
-                className="w-16 h-16 rounded-full object-cover"
-              />
-            ) : (
-              <div className="w-16 h-16 rounded-full bg-[var(--green)]/10 flex items-center justify-center">
-                <span className="text-2xl font-semibold text-[var(--green)]">
-                  {user.fullName.charAt(0).toUpperCase()}
-                </span>
-              </div>
-            )}
-            <div>
-              <h2 className="text-xl font-semibold text-[var(--text)]">{user.fullName}</h2>
-              <p className="text-[var(--text-muted)]">{user.email}</p>
-              {user.emailVerified && (
-                <div className="flex items-center gap-1 mt-1 text-sm text-[var(--green)]">
-                  <CheckIcon />
-                  <span>Email verified</span>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
+        {/* Editable Profile Section */}
+        <EditProfileSection user={user} onUpdate={handleProfileUpdate} />
 
         {/* Saved Plates */}
         <SavedPlatesSection />

@@ -712,3 +712,231 @@ export async function confirmPayment(
     listingSlug: data.listing_slug,
   };
 }
+
+// ============================================
+// USER PROFILE API
+// ============================================
+
+export interface UserProfile {
+  id: string;
+  email: string;
+  fullName: string;
+  avatarUrl?: string;
+  phoneNumber?: string;
+  isVerified: boolean;
+  createdAt: string;
+  authProvider: string;
+  notificationPreferences?: {
+    messages: boolean;
+    priceDrops: boolean;
+    newListings: boolean;
+    savedPlateUpdates: boolean;
+  };
+}
+
+export async function getUserProfile(accessToken: string): Promise<UserProfile> {
+  const url = `${API_BASE_URL}/api/users/me`;
+
+  const res = await fetch(url, {
+    headers: {
+      'Authorization': `Bearer ${accessToken}`,
+    },
+  });
+
+  if (!res.ok) {
+    throw new Error('Failed to fetch profile');
+  }
+
+  const data = await res.json();
+  return {
+    id: data.id,
+    email: data.email,
+    fullName: data.full_name,
+    avatarUrl: data.avatar_url,
+    phoneNumber: data.phone_number,
+    isVerified: data.is_verified,
+    createdAt: data.created_at,
+    authProvider: data.auth_provider,
+    notificationPreferences: data.notification_preferences,
+  };
+}
+
+export interface UpdateProfileData {
+  fullName?: string;
+  phoneNumber?: string;
+  avatarUrl?: string;
+  notificationPreferences?: {
+    messages: boolean;
+    priceDrops: boolean;
+    newListings: boolean;
+    savedPlateUpdates: boolean;
+  };
+}
+
+export async function updateUserProfile(
+  accessToken: string,
+  data: UpdateProfileData
+): Promise<UserProfile> {
+  const url = `${API_BASE_URL}/api/users/me`;
+
+  const res = await fetch(url, {
+    method: 'PATCH',
+    headers: {
+      'Authorization': `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      full_name: data.fullName,
+      phone_number: data.phoneNumber,
+      avatar_url: data.avatarUrl,
+      notification_preferences: data.notificationPreferences,
+    }),
+  });
+
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({}));
+    throw new Error(error.error || 'Failed to update profile');
+  }
+
+  const result = await res.json();
+  return {
+    id: result.id,
+    email: result.email,
+    fullName: result.full_name,
+    avatarUrl: result.avatar_url,
+    phoneNumber: result.phone_number,
+    isVerified: result.is_verified,
+    createdAt: result.created_at,
+    authProvider: result.auth_provider,
+    notificationPreferences: result.notification_preferences,
+  };
+}
+
+// ============================================
+// USER LISTINGS API
+// ============================================
+
+export interface UserListing {
+  id: string;
+  combination: string;
+  state: string;
+  plateType: string;
+  colorScheme: string;
+  price: number;
+  status: 'draft' | 'active' | 'sold';
+  slug: string;
+  viewsCount: number;
+  isFeatured: boolean;
+  boostExpiresAt?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export async function getUserListings(
+  accessToken: string,
+  status?: 'draft' | 'active' | 'sold'
+): Promise<UserListing[]> {
+  let url = `${API_BASE_URL}/api/users/me/listings`;
+  if (status) {
+    url += `?status=${status}`;
+  }
+
+  const res = await fetch(url, {
+    headers: {
+      'Authorization': `Bearer ${accessToken}`,
+    },
+  });
+
+  if (!res.ok) {
+    throw new Error('Failed to fetch listings');
+  }
+
+  const data = await res.json();
+  return data.map((listing: any) => ({
+    id: listing.id,
+    combination: listing.combination,
+    state: listing.state,
+    plateType: listing.plate_type,
+    colorScheme: listing.color_scheme,
+    price: listing.price,
+    status: listing.status,
+    slug: listing.slug,
+    viewsCount: listing.views_count,
+    isFeatured: listing.is_featured,
+    boostExpiresAt: listing.boost_expires_at,
+    createdAt: listing.created_at,
+    updatedAt: listing.updated_at,
+  }));
+}
+
+export interface UpdateListingData {
+  combination?: string;
+  state?: string;
+  plateType?: string;
+  colorScheme?: string;
+  sizeFormats?: [string, string];
+  material?: string;
+  vehicleType?: string;
+  price?: number;
+  isOpenToOffers?: boolean;
+  description?: string;
+  status?: 'draft' | 'active' | 'sold';
+}
+
+export async function updateListing(
+  accessToken: string,
+  listingId: string,
+  data: UpdateListingData
+): Promise<{ success: boolean }> {
+  const url = `${API_BASE_URL}/api/listings/${listingId}`;
+
+  const apiData: Record<string, any> = {};
+  if (data.combination !== undefined) apiData.combination = data.combination;
+  if (data.state !== undefined) apiData.state = data.state;
+  if (data.plateType !== undefined) apiData.plate_type = data.plateType;
+  if (data.colorScheme !== undefined) apiData.color_scheme = data.colorScheme;
+  if (data.sizeFormats !== undefined) apiData.size_formats = data.sizeFormats;
+  if (data.material !== undefined) apiData.material = data.material;
+  if (data.vehicleType !== undefined) apiData.vehicle_type = data.vehicleType;
+  if (data.price !== undefined) apiData.price = data.price;
+  if (data.isOpenToOffers !== undefined) apiData.is_open_to_offers = data.isOpenToOffers;
+  if (data.description !== undefined) apiData.description = data.description;
+  if (data.status !== undefined) apiData.status = data.status;
+
+  const res = await fetch(url, {
+    method: 'PATCH',
+    headers: {
+      'Authorization': `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(apiData),
+  });
+
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({}));
+    throw new Error(error.error || 'Failed to update listing');
+  }
+
+  return { success: true };
+}
+
+export async function deleteListing(
+  accessToken: string,
+  listingId: string
+): Promise<{ success: boolean }> {
+  const url = `${API_BASE_URL}/api/listings/${listingId}`;
+
+  const res = await fetch(url, {
+    method: 'DELETE',
+    headers: {
+      'Authorization': `Bearer ${accessToken}`,
+    },
+  });
+
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({}));
+    throw new Error(error.error || 'Failed to delete listing');
+  }
+
+  return { success: true };
+}

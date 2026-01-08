@@ -12,6 +12,7 @@ import { PlateFeatureTags } from '@/components/PlateFeatureTags';
 import { PlateView } from '@/components/PlateView';
 import { SaveButton } from '@/components/SaveButton';
 import { ContactSellerButton } from '@/components/ContactSellerButton';
+import { OwnerActions } from '@/components/OwnerActions';
 
 interface PageProps {
   params: Promise<{ slug: string }>;
@@ -235,17 +236,27 @@ export default async function ListingDetailPage({ params, searchParams }: PagePr
                 </div>
               )}
 
+              {/* Owner Actions - only visible to listing owner */}
+              {listing.seller?.id && (
+                <OwnerActions
+                  listingId={listing.id}
+                  sellerId={listing.seller.id}
+                  status={listing.status}
+                />
+              )}
+
               {/* Save Button */}
               <div className="mb-6">
                 <SaveButton listingId={listing.id} slug={listing.slug} size="large" />
               </div>
 
-              {/* Contact Seller */}
+              {/* Contact Seller - hide for owner */}
               <div className="mb-6">
                 <ContactSellerButton
                   listingId={listing.id}
                   combination={listing.combination}
                   sellerName={listing.seller?.fullName || 'Seller'}
+                  sellerId={listing.seller?.id}
                 />
               </div>
 

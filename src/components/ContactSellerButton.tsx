@@ -10,8 +10,8 @@ interface ContactSellerButtonProps {
   listingId: string;
   combination: string;
   sellerName: string;
-  /** If true, seller is the current user */
-  isOwnListing?: boolean;
+  /** Seller's user ID to check ownership */
+  sellerId?: string;
 }
 
 const QUICK_MESSAGES = [
@@ -24,16 +24,17 @@ export function ContactSellerButton({
   listingId,
   combination,
   sellerName,
-  isOwnListing = false,
+  sellerId,
 }: ContactSellerButtonProps) {
   const router = useRouter();
-  const { isAuthenticated, getAccessToken } = useAuth();
+  const { user, isAuthenticated, getAccessToken } = useAuth();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [message, setMessage] = useState('');
   const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Don't show button for own listings
+  // Don't show button if user is the seller
+  const isOwnListing = isAuthenticated && user && sellerId && user.id === sellerId;
   if (isOwnListing) {
     return null;
   }
