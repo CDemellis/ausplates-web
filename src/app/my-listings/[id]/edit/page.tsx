@@ -143,6 +143,14 @@ export default function EditListingPage({ params }: PageProps) {
         }
 
         setOriginalSlug(listing.slug);
+
+        // Merge photos from both sources:
+        // 1. photo_urls column (web uploads)
+        // 2. photos from listing_photos table (iOS app uploads)
+        const photoUrlsFromColumn = listing.photo_urls || [];
+        const photoUrlsFromTable = (listing.photos || []).map((p: { url: string }) => p.url);
+        const allPhotos = [...new Set([...photoUrlsFromColumn, ...photoUrlsFromTable])];
+
         setForm({
           combination: listing.combination,
           state: listing.state,
@@ -154,7 +162,7 @@ export default function EditListingPage({ params }: PageProps) {
           price: listing.price / 100, // Convert from cents
           isOpenToOffers: listing.is_open_to_offers ?? true,
           description: listing.description || '',
-          photos: listing.photo_urls || [],
+          photos: allPhotos,
         });
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load listing');
