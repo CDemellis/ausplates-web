@@ -41,17 +41,28 @@ export function Header() {
           {/* CTA / User Menu */}
           <div className="flex items-center gap-4">
             {!isLoading && isAuthenticated && user ? (
-              <Link
-                href="/profile"
-                className="hidden md:flex items-center gap-2 px-3 py-2 rounded-xl hover:bg-gray-100 transition-colors"
-              >
-                <div className="w-8 h-8 rounded-full bg-[var(--green)]/10 flex items-center justify-center">
-                  <span className="text-sm font-semibold text-[var(--green)]">
-                    {user.fullName.charAt(0).toUpperCase()}
-                  </span>
-                </div>
-                <span className="text-sm font-medium text-[var(--text)]">{user.fullName.split(' ')[0]}</span>
-              </Link>
+              <>
+                <Link
+                  href="/saved"
+                  className="hidden md:flex items-center gap-1.5 px-3 py-2 rounded-xl text-[var(--text-secondary)] hover:text-[var(--text)] hover:bg-gray-100 transition-colors"
+                >
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                  </svg>
+                  <span className="text-sm font-medium">Saved</span>
+                </Link>
+                <Link
+                  href="/profile"
+                  className="hidden md:flex items-center gap-2 px-3 py-2 rounded-xl hover:bg-gray-100 transition-colors"
+                >
+                  <div className="w-8 h-8 rounded-full bg-[var(--green)]/10 flex items-center justify-center">
+                    <span className="text-sm font-semibold text-[var(--green)]">
+                      {user.fullName.charAt(0).toUpperCase()}
+                    </span>
+                  </div>
+                  <span className="text-sm font-medium text-[var(--text)]">{user.fullName.split(' ')[0]}</span>
+                </Link>
+              </>
             ) : !isLoading ? (
               <Link
                 href="/signin"
