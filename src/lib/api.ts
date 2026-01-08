@@ -202,3 +202,22 @@ export async function getAllListingSlugs(): Promise<{ slug: string; updatedAt: s
     return [];
   }
 }
+
+// Get saved listings for authenticated user
+export async function getSavedListings(accessToken: string): Promise<Listing[]> {
+  const url = `${API_BASE_URL}/api/users/me/saved`;
+
+  const res = await fetch(url, {
+    headers: {
+      'Authorization': `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+  });
+
+  if (!res.ok) {
+    throw new Error('Failed to fetch saved listings');
+  }
+
+  const data: { data: APIListing[] } = await res.json();
+  return (data.data || []).map(transformListing);
+}
