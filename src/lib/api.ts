@@ -19,6 +19,7 @@ interface APIListing {
   color_scheme?: PlateColorScheme;
   size_format?: PlateSizeFormat;  // Legacy
   size_formats?: PlateSizeFormat[];
+  photo_urls?: string[];
   created_at: string;
   updated_at: string;
   seller?: {
@@ -57,6 +58,7 @@ function transformListing(api: APIListing): Listing {
     sellerId: api.user_id,
     colorScheme: api.color_scheme,
     sizeFormats: api.size_formats || [],
+    photoUrls: api.photo_urls || [],
     createdAt: api.created_at,
     updatedAt: api.updated_at,
   };

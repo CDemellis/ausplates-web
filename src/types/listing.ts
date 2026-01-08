@@ -108,6 +108,7 @@ export interface Listing {
   teamName?: string; // For AFL/NRL branded plates
   isDiscontinuedStyle?: boolean; // Plate style no longer available new
   characterCount?: number; // Auto-calculated character count
+  photoUrls?: string[]; // Photos uploaded by seller
   createdAt: string;
   updatedAt: string;
 }

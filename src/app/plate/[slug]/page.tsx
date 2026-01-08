@@ -178,6 +178,30 @@ export default async function ListingDetailPage({ params, searchParams }: PagePr
             <div>
               <PlateHero listing={listing} />
 
+              {/* Photo Gallery */}
+              {listing.photoUrls && listing.photoUrls.length > 0 && (
+                <div className="mt-6">
+                  <h3 className="text-sm font-medium text-[var(--text-secondary)] mb-3">Photos from seller</h3>
+                  <div className="grid grid-cols-3 gap-2">
+                    {listing.photoUrls.map((url, index) => (
+                      <a
+                        key={index}
+                        href={url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="aspect-square rounded-lg overflow-hidden bg-[var(--background-subtle)] hover:opacity-90 transition-opacity"
+                      >
+                        <img
+                          src={url}
+                          alt={`${listing.combination} photo ${index + 1}`}
+                          className="w-full h-full object-cover"
+                        />
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* Stats */}
               <div className="mt-6 flex items-center gap-6 text-sm text-[var(--text-muted)]">
                 <span className="flex items-center gap-1">
