@@ -644,7 +644,50 @@ export interface PaymentIntentResponse {
   listingSlug?: string;
 }
 
-// Create PaymentIntent for embedded checkout
+// Create Stripe Checkout Session (redirects to Stripe)
+export interface CheckoutResponse {
+  checkoutUrl?: string;
+  sessionId?: string;
+  free?: boolean;
+  listingSlug?: string;
+}
+
+export async function createCheckout(
+  accessToken: string,
+  listingId: string,
+  boostType: 'none' | '7day' | '30day',
+  promoCode?: string
+): Promise<CheckoutResponse> {
+  const url = `${API_BASE_URL}/api/payments/create-checkout`;
+
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      listing_id: listingId,
+      boost_type: boostType,
+      promo_code: promoCode,
+    }),
+  });
+
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({}));
+    throw new Error(error.error || 'Failed to create checkout session');
+  }
+
+  const data = await res.json();
+  return {
+    checkoutUrl: data.checkout_url,
+    sessionId: data.session_id,
+    free: data.free,
+    listingSlug: data.listing_slug,
+  };
+}
+
+// Legacy: Create PaymentIntent for embedded checkout
 export async function createPaymentIntent(
   accessToken: string,
   listingId: string,

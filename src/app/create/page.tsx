@@ -1,14 +1,11 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect, useCallback, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { loadStripe } from '@stripe/stripe-js';
-import { Elements } from '@stripe/react-stripe-js';
 import { useAuth } from '@/lib/auth-context';
 import { PlateView } from '@/components/PlateView';
-import { PaymentForm } from '@/components/PaymentForm';
-import { createListing, createPaymentIntent, confirmPayment } from '@/lib/api';
+import { createListing, createCheckout } from '@/lib/api';
 
 import {
   AustralianState,
@@ -22,12 +19,6 @@ import {
   PLATE_MATERIAL_NAMES,
   COLOR_SCHEME_COLORS,
 } from '@/types/listing';
-
-// Initialize Stripe
-const stripePromise = loadStripe(
-  process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY ||
-  'pk_test_51SnFqFLwPjhiNUoq347lEn7jr5uWcx8awI69xkagQ1LaFzqlTVmWneFp4K5fxQRzoeDysgief3a1oRQt5TsBdA6300EM67VDO1'
-);
 
 // ============================================
 // TYPES
@@ -606,22 +597,14 @@ function Step4Photos({
 function Step5Review({
   draft,
   onChange,
-  clientSecret,
-  paymentAmount,
   isCreatingListing,
   onCreateListing,
-  onPaymentSuccess,
-  onPaymentError,
   error,
 }: {
   draft: ListingDraft;
   onChange: (updates: Partial<ListingDraft>) => void;
-  clientSecret: string | null;
-  paymentAmount: number;
   isCreatingListing: boolean;
   onCreateListing: () => void;
-  onPaymentSuccess: (paymentIntentId: string) => void;
-  onPaymentError: (error: string) => void;
   error: string | null;
 }) {
   const listingFee = 999; // $9.99 in cents
@@ -665,146 +648,121 @@ function Step5Review({
         </dl>
       </div>
 
-      {/* Only show options if payment form not yet loaded */}
-      {!clientSecret && (
-        <>
-          {/* Promo Code */}
-          <div>
-            <label htmlFor="promo" className="block text-sm font-medium text-[var(--text)] mb-2">
-              Promo Code (optional)
-            </label>
+      {/* Promo Code */}
+      <div>
+        <label htmlFor="promo" className="block text-sm font-medium text-[var(--text)] mb-2">
+          Promo Code (optional)
+        </label>
+        <input
+          type="text"
+          id="promo"
+          value={draft.promoCode}
+          onChange={(e) => onChange({ promoCode: e.target.value.toUpperCase() })}
+          placeholder="Enter code"
+          className="w-full px-4 py-3 border border-[var(--border)] rounded-xl focus:outline-none focus:ring-2 focus:ring-[var(--green)] focus:border-transparent uppercase"
+        />
+      </div>
+
+      {/* Boost Options */}
+      <div>
+        <label className="block text-sm font-medium text-[var(--text)] mb-3">
+          Boost Your Listing
+        </label>
+        <div className="space-y-3">
+          <label className={`flex items-start gap-4 p-4 rounded-xl border-2 cursor-pointer transition-colors ${
+            draft.boostType === 'none' ? 'border-[var(--green)] bg-[var(--green)]/5' : 'border-[var(--border)]'
+          }`}>
             <input
-              type="text"
-              id="promo"
-              value={draft.promoCode}
-              onChange={(e) => onChange({ promoCode: e.target.value.toUpperCase() })}
-              placeholder="Enter code"
-              className="w-full px-4 py-3 border border-[var(--border)] rounded-xl focus:outline-none focus:ring-2 focus:ring-[var(--green)] focus:border-transparent uppercase"
+              type="radio"
+              name="boost"
+              checked={draft.boostType === 'none'}
+              onChange={() => onChange({ boostType: 'none' })}
+              className="mt-1"
             />
-          </div>
-
-          {/* Boost Options */}
-          <div>
-            <label className="block text-sm font-medium text-[var(--text)] mb-3">
-              Boost Your Listing
-            </label>
-            <div className="space-y-3">
-              <label className={`flex items-start gap-4 p-4 rounded-xl border-2 cursor-pointer transition-colors ${
-                draft.boostType === 'none' ? 'border-[var(--green)] bg-[var(--green)]/5' : 'border-[var(--border)]'
-              }`}>
-                <input
-                  type="radio"
-                  name="boost"
-                  checked={draft.boostType === 'none'}
-                  onChange={() => onChange({ boostType: 'none' })}
-                  className="mt-1"
-                />
-                <div className="flex-1">
-                  <p className="font-medium text-[var(--text)]">No Boost</p>
-                  <p className="text-sm text-[var(--text-muted)]">Standard listing</p>
-                </div>
-                <span className="font-medium text-[var(--text)]">$9.99</span>
-              </label>
-
-              <label className={`flex items-start gap-4 p-4 rounded-xl border-2 cursor-pointer transition-colors ${
-                draft.boostType === '7day' ? 'border-[var(--green)] bg-[var(--green)]/5' : 'border-[var(--border)]'
-              }`}>
-                <input
-                  type="radio"
-                  name="boost"
-                  checked={draft.boostType === '7day'}
-                  onChange={() => onChange({ boostType: '7day' })}
-                  className="mt-1"
-                />
-                <div className="flex-1">
-                  <p className="font-medium text-[var(--text)]">7-Day Boost</p>
-                  <p className="text-sm text-[var(--text-muted)]">Featured for 7 days, 3x more views</p>
-                </div>
-                <span className="font-medium text-[var(--text)]">+$9.99</span>
-              </label>
-
-              <label className={`flex items-start gap-4 p-4 rounded-xl border-2 cursor-pointer transition-colors relative ${
-                draft.boostType === '30day' ? 'border-[var(--green)] bg-[var(--green)]/5' : 'border-[var(--border)]'
-              }`}>
-                <span className="absolute -top-2 right-4 px-2 py-0.5 bg-[var(--gold)] text-xs font-semibold rounded">BEST VALUE</span>
-                <input
-                  type="radio"
-                  name="boost"
-                  checked={draft.boostType === '30day'}
-                  onChange={() => onChange({ boostType: '30day' })}
-                  className="mt-1"
-                />
-                <div className="flex-1">
-                  <p className="font-medium text-[var(--text)]">30-Day Boost</p>
-                  <p className="text-sm text-[var(--text-muted)]">Listing fee + 30 days featured, priority placement</p>
-                </div>
-                <span className="font-medium text-[var(--text)]">$24.99</span>
-              </label>
+            <div className="flex-1">
+              <p className="font-medium text-[var(--text)]">Standard Listing</p>
+              <p className="text-sm text-[var(--text-muted)]">Basic listing on AusPlates</p>
             </div>
-          </div>
+            <span className="font-medium text-[var(--text)]">$9.99</span>
+          </label>
 
-          {/* Total */}
-          <div className="bg-[var(--text)] text-white rounded-xl p-6">
-            <div className="flex justify-between items-center">
-              <span className="text-lg">Total</span>
-              <span className="text-2xl font-bold">${(getTotal() / 100).toFixed(2)}</span>
-            </div>
-          </div>
-
-          {/* Error Message */}
-          {error && (
-            <div className="p-4 bg-red-50 border border-red-200 rounded-xl">
-              <p className="text-sm text-red-600">{error}</p>
-            </div>
-          )}
-
-          {/* Continue to Payment Button */}
-          <button
-            type="button"
-            onClick={onCreateListing}
-            disabled={isCreatingListing}
-            className="w-full py-4 bg-[var(--green)] text-white text-lg font-semibold rounded-xl hover:bg-[#006B31] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-          >
-            {isCreatingListing ? 'Creating Listing...' : 'Continue to Payment'}
-          </button>
-
-          <p className="text-xs text-center text-[var(--text-muted)]">
-            By listing, you agree to our Terms of Service and confirm this plate is legally transferable.
-          </p>
-        </>
-      )}
-
-      {/* Stripe Payment Form */}
-      {clientSecret && (
-        <div className="space-y-4">
-          <div className="bg-[var(--text)] text-white rounded-xl p-6 mb-4">
-            <div className="flex justify-between items-center">
-              <span className="text-lg">Total to Pay</span>
-              <span className="text-2xl font-bold">${(paymentAmount / 100).toFixed(2)}</span>
-            </div>
-          </div>
-
-          <Elements
-            stripe={stripePromise}
-            options={{
-              clientSecret,
-              appearance: {
-                theme: 'stripe',
-                variables: {
-                  colorPrimary: '#00843D',
-                  borderRadius: '12px',
-                },
-              },
-            }}
-          >
-            <PaymentForm
-              amount={paymentAmount}
-              onSuccess={onPaymentSuccess}
-              onError={onPaymentError}
+          <label className={`flex items-start gap-4 p-4 rounded-xl border-2 cursor-pointer transition-colors ${
+            draft.boostType === '7day' ? 'border-[var(--green)] bg-[var(--green)]/5' : 'border-[var(--border)]'
+          }`}>
+            <input
+              type="radio"
+              name="boost"
+              checked={draft.boostType === '7day'}
+              onChange={() => onChange({ boostType: '7day' })}
+              className="mt-1"
             />
-          </Elements>
+            <div className="flex-1">
+              <p className="font-medium text-[var(--text)]">7-Day Boost</p>
+              <p className="text-sm text-[var(--text-muted)]">Featured for 7 days, 3x more views</p>
+            </div>
+            <span className="font-medium text-[var(--text)]">$19.98</span>
+          </label>
+
+          <label className={`flex items-start gap-4 p-4 rounded-xl border-2 cursor-pointer transition-colors relative ${
+            draft.boostType === '30day' ? 'border-[var(--green)] bg-[var(--green)]/5' : 'border-[var(--border)]'
+          }`}>
+            <span className="absolute -top-2 right-4 px-2 py-0.5 bg-[var(--gold)] text-xs font-semibold rounded">BEST VALUE</span>
+            <input
+              type="radio"
+              name="boost"
+              checked={draft.boostType === '30day'}
+              onChange={() => onChange({ boostType: '30day' })}
+              className="mt-1"
+            />
+            <div className="flex-1">
+              <p className="font-medium text-[var(--text)]">30-Day Boost</p>
+              <p className="text-sm text-[var(--text-muted)]">30 days featured, priority placement</p>
+            </div>
+            <span className="font-medium text-[var(--text)]">$24.99</span>
+          </label>
+        </div>
+      </div>
+
+      {/* Total */}
+      <div className="bg-[var(--text)] text-white rounded-xl p-6">
+        <div className="flex justify-between items-center">
+          <span className="text-lg">Total</span>
+          <span className="text-2xl font-bold">${(getTotal() / 100).toFixed(2)}</span>
+        </div>
+      </div>
+
+      {/* Error Message */}
+      {error && (
+        <div className="p-4 bg-red-50 border border-red-200 rounded-xl">
+          <p className="text-sm text-red-600">{error}</p>
         </div>
       )}
+
+      {/* Continue to Payment Button */}
+      <button
+        type="button"
+        onClick={onCreateListing}
+        disabled={isCreatingListing}
+        className="w-full py-4 bg-[var(--green)] text-white text-lg font-semibold rounded-xl hover:bg-[#006B31] disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+      >
+        {isCreatingListing ? (
+          <>
+            <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+            Redirecting to Payment...
+          </>
+        ) : (
+          <>
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+            </svg>
+            Continue to Secure Payment
+          </>
+        )}
+      </button>
+
+      <p className="text-xs text-center text-[var(--text-muted)]">
+        You&apos;ll be redirected to Stripe for secure payment. By listing, you agree to our Terms of Service and confirm this plate is legally transferable.
+      </p>
     </div>
   );
 }
@@ -813,20 +771,18 @@ function Step5Review({
 // MAIN COMPONENT
 // ============================================
 
-export default function CreateListingPage() {
+function CreateListingContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { isAuthenticated, isLoading: authLoading, getAccessToken } = useAuth();
 
   const [currentStep, setCurrentStep] = useState(1);
   const [draft, setDraft] = useState<ListingDraft>(INITIAL_DRAFT);
   const [submitError, setSubmitError] = useState<string | null>(null);
-
-  // Payment state
   const [isCreatingListing, setIsCreatingListing] = useState(false);
-  const [isConfirmingPayment, setIsConfirmingPayment] = useState(false);
-  const [listingId, setListingId] = useState<string | null>(null);
-  const [clientSecret, setClientSecret] = useState<string | null>(null);
-  const [paymentAmount, setPaymentAmount] = useState(0);
+
+  // Check for cancelled payment return
+  const wasCancelled = searchParams.get('cancelled') === 'true';
 
   // Load draft from localStorage
   useEffect(() => {
@@ -886,7 +842,7 @@ export default function CreateListingPage() {
     }
   };
 
-  // Step 1: Create listing and get PaymentIntent
+  // Create listing and redirect to Stripe Checkout
   const handleCreateListing = async () => {
     if (!draft.state || !draft.plateType) return;
 
@@ -915,10 +871,8 @@ export default function CreateListingPage() {
         photoUrls: undefined,
       });
 
-      setListingId(listing.id);
-
-      // Create PaymentIntent
-      const paymentResult = await createPaymentIntent(
+      // Create Stripe Checkout Session
+      const checkoutResult = await createCheckout(
         token,
         listing.id,
         draft.boostType,
@@ -926,57 +880,24 @@ export default function CreateListingPage() {
       );
 
       // If free (promo code covered full amount), redirect to listing
-      if (paymentResult.free && paymentResult.listingSlug) {
+      if (checkoutResult.free && checkoutResult.listingSlug) {
         localStorage.removeItem(STORAGE_KEY);
-        router.push(`/plate/${paymentResult.listingSlug}`);
+        router.push(`/plate/${checkoutResult.listingSlug}?created=true`);
         return;
       }
 
-      // Set payment form state
-      if (paymentResult.clientSecret && paymentResult.amount) {
-        setClientSecret(paymentResult.clientSecret);
-        setPaymentAmount(paymentResult.amount);
+      // Redirect to Stripe Checkout
+      if (checkoutResult.checkoutUrl) {
+        // Keep draft in localStorage so user can resume if they cancel
+        window.location.href = checkoutResult.checkoutUrl;
       } else {
-        throw new Error('Failed to initialize payment');
+        throw new Error('Failed to create checkout session');
       }
     } catch (error) {
       console.error('Create listing error:', error);
       setSubmitError(error instanceof Error ? error.message : 'Something went wrong. Please try again.');
-    } finally {
       setIsCreatingListing(false);
     }
-  };
-
-  // Step 2: Confirm payment and publish listing
-  const handlePaymentSuccess = async (paymentIntentId: string) => {
-    setIsConfirmingPayment(true);
-    setSubmitError(null);
-
-    try {
-      const token = await getAccessToken();
-      if (!token) {
-        throw new Error('Not authenticated');
-      }
-
-      const result = await confirmPayment(token, paymentIntentId);
-
-      if (result.success && result.listingSlug) {
-        localStorage.removeItem(STORAGE_KEY);
-        router.push(`/plate/${result.listingSlug}?created=true`);
-      } else {
-        throw new Error('Failed to publish listing');
-      }
-    } catch (error) {
-      console.error('Payment confirmation error:', error);
-      setSubmitError(error instanceof Error ? error.message : 'Failed to confirm payment');
-      setIsConfirmingPayment(false);
-      setClientSecret(null); // Reset to show options again
-    }
-  };
-
-  const handlePaymentError = (error: string) => {
-    setSubmitError(error);
-    setClientSecret(null); // Reset to show options again
   };
 
   // Loading state
@@ -1027,13 +948,9 @@ export default function CreateListingPage() {
                 <Step5Review
                   draft={draft}
                   onChange={updateDraft}
-                  clientSecret={clientSecret}
-                  paymentAmount={paymentAmount}
                   isCreatingListing={isCreatingListing}
                   onCreateListing={handleCreateListing}
-                  onPaymentSuccess={handlePaymentSuccess}
-                  onPaymentError={handlePaymentError}
-                  error={submitError}
+                  error={submitError || (wasCancelled ? 'Payment was cancelled. You can try again.' : null)}
                 />
               )}
 
@@ -1075,26 +992,22 @@ export default function CreateListingPage() {
       <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-[var(--border)] p-4">
         <StickyPlatePreview draft={draft} />
       </div>
-
-      {/* Payment Success Modal */}
-      {isConfirmingPayment && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          {/* Backdrop */}
-          <div className="absolute inset-0 bg-black/50" />
-
-          {/* Modal */}
-          <div className="relative bg-white rounded-2xl p-8 max-w-sm w-full text-center shadow-xl">
-            <div className="w-16 h-16 bg-[var(--green)]/10 rounded-full flex items-center justify-center mx-auto mb-4">
-              <svg className="w-8 h-8 text-[var(--green)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-              </svg>
-            </div>
-            <h2 className="text-xl font-semibold text-[var(--text)] mb-2">Payment Successful!</h2>
-            <p className="text-[var(--text-secondary)] mb-4">Publishing your listing...</p>
-            <div className="w-8 h-8 border-3 border-[var(--green)] border-t-transparent rounded-full animate-spin mx-auto" />
-          </div>
-        </div>
-      )}
     </div>
+  );
+}
+
+function LoadingFallback() {
+  return (
+    <div className="min-h-screen bg-[var(--background)] flex items-center justify-center">
+      <div className="w-8 h-8 border-4 border-[var(--green)] border-t-transparent rounded-full animate-spin" />
+    </div>
+  );
+}
+
+export default function CreateListingPage() {
+  return (
+    <Suspense fallback={<LoadingFallback />}>
+      <CreateListingContent />
+    </Suspense>
   );
 }

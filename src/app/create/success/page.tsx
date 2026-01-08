@@ -1,58 +1,35 @@
 'use client';
 
 import { Suspense, useEffect, useState } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { confirmPayment } from '@/lib/api';
-import { useAuth } from '@/lib/auth-context';
 
 function SuccessContent() {
   const searchParams = useSearchParams();
-  const { getAccessToken } = useAuth();
+  const router = useRouter();
 
-  // PaymentIntent flow: payment_intent and payment_intent_client_secret
-  const paymentIntentId = searchParams.get('payment_intent');
-  const redirectStatus = searchParams.get('redirect_status');
+  // Checkout Session flow: session_id is passed by Stripe
+  const sessionId = searchParams.get('session_id');
 
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
-  const [listingSlug, setListingSlug] = useState<string | null>(null);
 
   useEffect(() => {
-    // Handle PaymentIntent redirect (e.g., after 3D Secure)
-    if (!paymentIntentId) {
+    if (!sessionId) {
       setStatus('error');
       return;
     }
 
-    // Check redirect status
-    if (redirectStatus && redirectStatus !== 'succeeded') {
-      setStatus('error');
-      return;
-    }
+    // The webhook handles publishing the listing.
+    // We just show success and clear the draft from localStorage.
+    localStorage.removeItem('ausplates_listing_draft');
 
-    const confirmPaymentAndPublish = async () => {
-      try {
-        const token = await getAccessToken();
-        if (!token) {
-          setStatus('error');
-          return;
-        }
+    // Small delay to ensure webhook has processed
+    const timer = setTimeout(() => {
+      setStatus('success');
+    }, 1500);
 
-        const result = await confirmPayment(token, paymentIntentId);
-
-        if (result.success && result.listingSlug) {
-          setStatus('success');
-          setListingSlug(result.listingSlug);
-        } else {
-          setStatus('error');
-        }
-      } catch {
-        setStatus('error');
-      }
-    };
-
-    confirmPaymentAndPublish();
-  }, [paymentIntentId, redirectStatus, getAccessToken]);
+    return () => clearTimeout(timer);
+  }, [sessionId]);
 
   if (status === 'loading') {
     return (
@@ -110,19 +87,17 @@ function SuccessContent() {
           Your listing is now live and visible to buyers across Australia.
         </p>
         <div className="flex flex-col gap-3">
-          {listingSlug && (
-            <Link
-              href={`/plate/${listingSlug}`}
-              className="px-6 py-3 bg-[var(--green)] text-white font-medium rounded-xl hover:bg-[#006B31] transition-colors"
-            >
-              View Your Listing
-            </Link>
-          )}
           <Link
-            href="/profile"
+            href="/my-listings"
+            className="px-6 py-3 bg-[var(--green)] text-white font-medium rounded-xl hover:bg-[#006B31] transition-colors"
+          >
+            View My Listings
+          </Link>
+          <Link
+            href="/plates"
             className="px-6 py-3 border border-[var(--border)] text-[var(--text)] font-medium rounded-xl hover:bg-[var(--background-subtle)] transition-colors"
           >
-            Go to Profile
+            Browse All Plates
           </Link>
           <Link
             href="/"
