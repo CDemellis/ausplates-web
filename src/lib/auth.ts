@@ -258,7 +258,14 @@ export async function getLinkingStatus(accessToken: string): Promise<LinkingStat
     throw new Error(data.error || 'Failed to get linking status');
   }
 
-  return data;
+  // Transform snake_case to camelCase
+  return {
+    hasEmail: data.has_email,
+    hasApple: data.has_apple,
+    authProvider: data.auth_provider,
+    email: data.email,
+    emailVerified: data.email_verified,
+  };
 }
 
 // Link Apple ID to account
@@ -298,5 +305,10 @@ export async function linkEmail(accessToken: string, email: string, password: st
     throw new Error(data.error || 'Failed to link email');
   }
 
-  return data;
+  // Transform snake_case to camelCase
+  return {
+    success: data.success,
+    message: data.message,
+    requiresVerification: data.requires_verification,
+  };
 }
