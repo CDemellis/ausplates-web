@@ -212,7 +212,8 @@ export default function EditListingPage({ params }: PageProps) {
         price: form.price * 100, // Convert to cents
         isOpenToOffers: form.isOpenToOffers,
         description: form.description,
-        photoUrls: allPhotoUrls.length > 0 ? allPhotoUrls : undefined,
+        // Always send photoUrls so API can sync listing_photos table
+        photoUrls: allPhotoUrls,
       };
 
       await updateListing(token, id, updateData);
