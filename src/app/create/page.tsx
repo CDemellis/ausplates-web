@@ -3,9 +3,14 @@
 import { useState, useEffect, useCallback, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
+import { loadStripe } from '@stripe/stripe-js';
+import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { useAuth } from '@/lib/auth-context';
 import { PlateView } from '@/components/PlateView';
-import { createListing, createCheckout } from '@/lib/api';
+import { createListing, createCheckout, confirmPayment } from '@/lib/api';
+
+// Initialize Stripe
+const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || '');
 
 import {
   AustralianState,
@@ -593,6 +598,94 @@ function Step4Photos({
   );
 }
 
+// Payment Form Component (uses Stripe Elements)
+function PaymentForm({
+  amount,
+  onSuccess,
+  onError,
+  paymentIntentId,
+}: {
+  amount: number;
+  onSuccess: () => void;
+  onError: (error: string) => void;
+  paymentIntentId: string;
+}) {
+  const stripe = useStripe();
+  const elements = useElements();
+  const [isProcessing, setIsProcessing] = useState(false);
+  const { getAccessToken } = useAuth();
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!stripe || !elements) {
+      return;
+    }
+
+    setIsProcessing(true);
+
+    try {
+      const { error, paymentIntent } = await stripe.confirmPayment({
+        elements,
+        confirmParams: {
+          return_url: `${window.location.origin}/create/success`,
+        },
+        redirect: 'if_required',
+      });
+
+      if (error) {
+        onError(error.message || 'Payment failed');
+        setIsProcessing(false);
+        return;
+      }
+
+      if (paymentIntent && paymentIntent.status === 'succeeded') {
+        // Confirm with our backend to publish the listing
+        const token = await getAccessToken();
+        if (token) {
+          await confirmPayment(token, paymentIntentId);
+        }
+        onSuccess();
+      }
+    } catch (err) {
+      onError(err instanceof Error ? err.message : 'Payment failed');
+      setIsProcessing(false);
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-6">
+      <div className="bg-white border border-[var(--border)] rounded-xl p-4">
+        <PaymentElement />
+      </div>
+
+      <button
+        type="submit"
+        disabled={!stripe || isProcessing}
+        className="w-full py-4 bg-[var(--green)] text-white text-lg font-semibold rounded-xl hover:bg-[#006B31] disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+      >
+        {isProcessing ? (
+          <>
+            <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+            Processing...
+          </>
+        ) : (
+          <>
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+            </svg>
+            Pay ${(amount / 100).toFixed(2)} AUD
+          </>
+        )}
+      </button>
+
+      <p className="text-xs text-center text-[var(--text-muted)]">
+        Your payment is secure and encrypted by Stripe.
+      </p>
+    </form>
+  );
+}
+
 // Step 5: Review & Pay
 function Step5Review({
   draft,
@@ -600,12 +693,22 @@ function Step5Review({
   isCreatingListing,
   onCreateListing,
   error,
+  clientSecret,
+  paymentIntentId,
+  paymentAmount,
+  onPaymentSuccess,
+  onPaymentError,
 }: {
   draft: ListingDraft;
   onChange: (updates: Partial<ListingDraft>) => void;
   isCreatingListing: boolean;
   onCreateListing: () => void;
   error: string | null;
+  clientSecret: string | null;
+  paymentIntentId: string | null;
+  paymentAmount: number;
+  onPaymentSuccess: () => void;
+  onPaymentError: (error: string) => void;
 }) {
   const listingFee = 999; // $9.99 in cents
   const boost7DayTotal = 1998; // $19.98 (listing + 7-day boost)
@@ -616,6 +719,53 @@ function Step5Review({
     if (draft.boostType === '30day') return boost30DayTotal;
     return listingFee;
   };
+
+  // If we have clientSecret, show the payment form
+  if (clientSecret && paymentIntentId) {
+    return (
+      <div className="space-y-6">
+        {/* Summary (compact) */}
+        <div className="bg-[var(--background-subtle)] rounded-xl p-4">
+          <div className="flex justify-between items-center">
+            <div>
+              <p className="font-semibold text-[var(--text)]">{draft.combination}</p>
+              <p className="text-sm text-[var(--text-muted)]">{draft.state} • {draft.plateType && PLATE_TYPE_NAMES[draft.plateType]}</p>
+            </div>
+            <p className="text-xl font-bold text-[var(--text)]">${(paymentAmount / 100).toFixed(2)}</p>
+          </div>
+        </div>
+
+        {/* Error Message */}
+        {error && (
+          <div className="p-4 bg-red-50 border border-red-200 rounded-xl">
+            <p className="text-sm text-red-600">{error}</p>
+          </div>
+        )}
+
+        {/* Stripe Elements Payment Form */}
+        <Elements
+          stripe={stripePromise}
+          options={{
+            clientSecret,
+            appearance: {
+              theme: 'stripe',
+              variables: {
+                colorPrimary: '#00843D',
+                borderRadius: '12px',
+              },
+            },
+          }}
+        >
+          <PaymentForm
+            amount={paymentAmount}
+            onSuccess={onPaymentSuccess}
+            onError={onPaymentError}
+            paymentIntentId={paymentIntentId}
+          />
+        </Elements>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -748,20 +898,20 @@ function Step5Review({
         {isCreatingListing ? (
           <>
             <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-            Redirecting to Payment...
+            Preparing Payment...
           </>
         ) : (
           <>
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
             </svg>
-            Continue to Secure Payment
+            Continue to Payment
           </>
         )}
       </button>
 
       <p className="text-xs text-center text-[var(--text-muted)]">
-        You&apos;ll be redirected to Stripe for secure payment. By listing, you agree to our Terms of Service and confirm this plate is legally transferable.
+        By listing, you agree to our Terms of Service and confirm this plate is legally transferable.
       </p>
     </div>
   );
@@ -781,8 +931,11 @@ function CreateListingContent() {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [isCreatingListing, setIsCreatingListing] = useState(false);
 
-  // Check for cancelled payment return
-  const wasCancelled = searchParams.get('cancelled') === 'true';
+  // Payment state for embedded Stripe Elements
+  const [clientSecret, setClientSecret] = useState<string | null>(null);
+  const [paymentIntentId, setPaymentIntentId] = useState<string | null>(null);
+  const [paymentAmount, setPaymentAmount] = useState(0);
+  const [createdListingSlug, setCreatedListingSlug] = useState<string | null>(null);
 
   // Load draft from localStorage
   useEffect(() => {
@@ -842,7 +995,7 @@ function CreateListingContent() {
     }
   };
 
-  // Create listing and redirect to Stripe Checkout
+  // Create listing and get PaymentIntent for embedded checkout
   const handleCreateListing = async () => {
     if (!draft.state || !draft.plateType) return;
 
@@ -871,7 +1024,10 @@ function CreateListingContent() {
         photoUrls: undefined,
       });
 
-      // Create Stripe Checkout Session
+      // Store the listing slug for success redirect
+      setCreatedListingSlug(listing.slug);
+
+      // Create PaymentIntent for embedded checkout
       const checkoutResult = await createCheckout(
         token,
         listing.id,
@@ -886,18 +1042,31 @@ function CreateListingContent() {
         return;
       }
 
-      // Redirect to Stripe Checkout
-      if (checkoutResult.checkoutUrl) {
-        // Keep draft in localStorage so user can resume if they cancel
-        window.location.href = checkoutResult.checkoutUrl;
+      // Set up embedded payment form
+      if (checkoutResult.clientSecret && checkoutResult.paymentIntentId) {
+        setClientSecret(checkoutResult.clientSecret);
+        setPaymentIntentId(checkoutResult.paymentIntentId);
+        setPaymentAmount(checkoutResult.amount || 999);
+        setIsCreatingListing(false);
       } else {
-        throw new Error('Failed to create checkout session');
+        throw new Error('Failed to create payment');
       }
     } catch (error) {
       console.error('Create listing error:', error);
       setSubmitError(error instanceof Error ? error.message : 'Something went wrong. Please try again.');
       setIsCreatingListing(false);
     }
+  };
+
+  // Handle successful payment
+  const handlePaymentSuccess = () => {
+    localStorage.removeItem(STORAGE_KEY);
+    router.push('/create/success?payment=complete');
+  };
+
+  // Handle payment error
+  const handlePaymentError = (error: string) => {
+    setSubmitError(error);
   };
 
   // Loading state
@@ -950,7 +1119,12 @@ function CreateListingContent() {
                   onChange={updateDraft}
                   isCreatingListing={isCreatingListing}
                   onCreateListing={handleCreateListing}
-                  error={submitError || (wasCancelled ? 'Payment was cancelled. You can try again.' : null)}
+                  error={submitError}
+                  clientSecret={clientSecret}
+                  paymentIntentId={paymentIntentId}
+                  paymentAmount={paymentAmount}
+                  onPaymentSuccess={handlePaymentSuccess}
+                  onPaymentError={handlePaymentError}
                 />
               )}
 

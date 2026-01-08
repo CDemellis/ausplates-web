@@ -8,13 +8,13 @@ function SuccessContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
 
-  // Checkout Session flow: session_id is passed by Stripe
-  const sessionId = searchParams.get('session_id');
+  // Payment complete flow from embedded checkout
+  const paymentComplete = searchParams.get('payment') === 'complete';
 
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
 
   useEffect(() => {
-    if (!sessionId) {
+    if (!paymentComplete) {
       setStatus('error');
       return;
     }
@@ -29,7 +29,7 @@ function SuccessContent() {
     }, 1500);
 
     return () => clearTimeout(timer);
-  }, [sessionId]);
+  }, [paymentComplete]);
 
   if (status === 'loading') {
     return (

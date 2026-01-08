@@ -644,10 +644,11 @@ export interface PaymentIntentResponse {
   listingSlug?: string;
 }
 
-// Create Stripe Checkout Session (redirects to Stripe)
+// Create Stripe PaymentIntent for embedded Elements checkout
 export interface CheckoutResponse {
-  checkoutUrl?: string;
-  sessionId?: string;
+  clientSecret?: string;
+  paymentIntentId?: string;
+  amount?: number;
   free?: boolean;
   listingSlug?: string;
 }
@@ -675,13 +676,14 @@ export async function createCheckout(
 
   if (!res.ok) {
     const error = await res.json().catch(() => ({}));
-    throw new Error(error.error || 'Failed to create checkout session');
+    throw new Error(error.error || 'Failed to create payment intent');
   }
 
   const data = await res.json();
   return {
-    checkoutUrl: data.checkout_url,
-    sessionId: data.session_id,
+    clientSecret: data.client_secret,
+    paymentIntentId: data.payment_intent_id,
+    amount: data.amount,
     free: data.free,
     listingSlug: data.listing_slug,
   };
