@@ -1,8 +1,9 @@
 import Link from 'next/link';
 import { ListingCard } from '@/components/ListingCard';
 import { PlateView } from '@/components/PlateView';
+import { StateCard } from '@/components/StateCard';
 import { getFeaturedListings, getRecentListings } from '@/lib/api';
-import { AustralianState, STATE_NAMES, Listing } from '@/types/listing';
+import { AustralianState, Listing } from '@/types/listing';
 
 const STATES: AustralianState[] = ['VIC', 'NSW', 'QLD', 'SA', 'WA', 'TAS', 'NT', 'ACT'];
 
@@ -146,16 +147,7 @@ export default async function HomePage() {
 
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
             {STATES.map((state) => (
-              <Link
-                key={state}
-                href={`/plates/${state.toLowerCase()}`}
-                className="group flex flex-col items-center p-6 bg-white rounded-2xl shadow-sm hover:shadow-md transition-all"
-              >
-                <PlateView combination={state} state={state} size="small" />
-                <span className="mt-3 text-sm font-medium text-[var(--text)] group-hover:text-[var(--green)] transition-colors">
-                  {STATE_NAMES[state]}
-                </span>
-              </Link>
+              <StateCard key={state} state={state} />
             ))}
           </div>
         </div>
