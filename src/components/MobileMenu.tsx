@@ -83,11 +83,19 @@ export function MobileMenu() {
                     className="flex items-center gap-3 px-4 py-3 text-base font-medium text-[var(--text)] rounded-lg hover:bg-[var(--background-subtle)] transition-colors"
                     onClick={() => setIsOpen(false)}
                   >
-                    <div className="w-8 h-8 rounded-full bg-[var(--green)]/10 flex items-center justify-center">
-                      <span className="text-sm font-semibold text-[var(--green)]">
-                        {user.fullName.charAt(0).toUpperCase()}
-                      </span>
-                    </div>
+                    {user.avatarUrl ? (
+                      <img
+                        src={user.avatarUrl}
+                        alt={user.fullName}
+                        className="w-8 h-8 rounded-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-8 h-8 rounded-full bg-[var(--green)]/10 flex items-center justify-center">
+                        <span className="text-sm font-semibold text-[var(--green)]">
+                          {user.fullName.charAt(0).toUpperCase()}
+                        </span>
+                      </div>
+                    )}
                     <span>Profile & Settings</span>
                   </Link>
                 </>

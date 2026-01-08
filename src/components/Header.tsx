@@ -55,11 +55,19 @@ export function Header() {
                   href="/profile"
                   className="hidden md:flex items-center gap-2 px-3 py-2 rounded-xl hover:bg-gray-100 transition-colors"
                 >
-                  <div className="w-8 h-8 rounded-full bg-[var(--green)]/10 flex items-center justify-center">
-                    <span className="text-sm font-semibold text-[var(--green)]">
-                      {user.fullName.charAt(0).toUpperCase()}
-                    </span>
-                  </div>
+                  {user.avatarUrl ? (
+                    <img
+                      src={user.avatarUrl}
+                      alt={user.fullName}
+                      className="w-8 h-8 rounded-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-8 h-8 rounded-full bg-[var(--green)]/10 flex items-center justify-center">
+                      <span className="text-sm font-semibold text-[var(--green)]">
+                        {user.fullName.charAt(0).toUpperCase()}
+                      </span>
+                    </div>
+                  )}
                   <span className="text-sm font-medium text-[var(--text)]">{user.fullName.split(' ')[0]}</span>
                 </Link>
               </>
