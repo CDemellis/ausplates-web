@@ -3,27 +3,46 @@
 import { Suspense, useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { getCheckoutSession } from '@/lib/api';
+import { confirmPayment } from '@/lib/api';
+import { useAuth } from '@/lib/auth-context';
 
 function SuccessContent() {
   const searchParams = useSearchParams();
-  const sessionId = searchParams.get('session_id');
+  const { getAccessToken } = useAuth();
+
+  // PaymentIntent flow: payment_intent and payment_intent_client_secret
+  const paymentIntentId = searchParams.get('payment_intent');
+  const redirectStatus = searchParams.get('redirect_status');
 
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
-  const [listingId, setListingId] = useState<string | null>(null);
+  const [listingSlug, setListingSlug] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!sessionId) {
+    // Handle PaymentIntent redirect (e.g., after 3D Secure)
+    if (!paymentIntentId) {
       setStatus('error');
       return;
     }
 
-    const checkSession = async () => {
+    // Check redirect status
+    if (redirectStatus && redirectStatus !== 'succeeded') {
+      setStatus('error');
+      return;
+    }
+
+    const confirmPaymentAndPublish = async () => {
       try {
-        const session = await getCheckoutSession(sessionId);
-        if (session.status === 'paid') {
+        const token = await getAccessToken();
+        if (!token) {
+          setStatus('error');
+          return;
+        }
+
+        const result = await confirmPayment(token, paymentIntentId);
+
+        if (result.success && result.listingSlug) {
           setStatus('success');
-          setListingId(session.listingId || null);
+          setListingSlug(result.listingSlug);
         } else {
           setStatus('error');
         }
@@ -32,8 +51,8 @@ function SuccessContent() {
       }
     };
 
-    checkSession();
-  }, [sessionId]);
+    confirmPaymentAndPublish();
+  }, [paymentIntentId, redirectStatus, getAccessToken]);
 
   if (status === 'loading') {
     return (
@@ -91,9 +110,9 @@ function SuccessContent() {
           Your listing is now live and visible to buyers across Australia.
         </p>
         <div className="flex flex-col gap-3">
-          {listingId && (
+          {listingSlug && (
             <Link
-              href={`/plate/${listingId}`}
+              href={`/plate/${listingSlug}`}
               className="px-6 py-3 bg-[var(--green)] text-white font-medium rounded-xl hover:bg-[#006B31] transition-colors"
             >
               View Your Listing

@@ -634,22 +634,24 @@ export async function createListing(accessToken: string, data: CreateListingData
 // PAYMENTS API
 // ============================================
 
-export interface CheckoutResponse {
-  checkoutUrl?: string;
-  sessionId?: string;
+export interface PaymentIntentResponse {
+  clientSecret?: string;
+  amount?: number;
+  listingFee?: number;
+  boostFee?: number;
   success?: boolean;
   free?: boolean;
-  redirectUrl?: string;
+  listingSlug?: string;
 }
 
-// Create Stripe checkout session
-export async function createCheckout(
+// Create PaymentIntent for embedded checkout
+export async function createPaymentIntent(
   accessToken: string,
   listingId: string,
   boostType: 'none' | '7day' | '30day',
   promoCode?: string
-): Promise<CheckoutResponse> {
-  const url = `${API_BASE_URL}/api/payments/create-checkout`;
+): Promise<PaymentIntentResponse> {
+  const url = `${API_BASE_URL}/api/payments/create-payment-intent`;
 
   const res = await fetch(url, {
     method: 'POST',
@@ -666,36 +668,47 @@ export async function createCheckout(
 
   if (!res.ok) {
     const error = await res.json().catch(() => ({}));
-    throw new Error(error.error || 'Failed to create checkout');
+    throw new Error(error.error || 'Failed to create payment intent');
   }
 
   const data = await res.json();
   return {
-    checkoutUrl: data.checkout_url,
-    sessionId: data.session_id,
+    clientSecret: data.client_secret,
+    amount: data.amount,
+    listingFee: data.listing_fee,
+    boostFee: data.boost_fee,
     success: data.success,
     free: data.free,
-    redirectUrl: data.redirect_url,
+    listingSlug: data.listing_slug,
   };
 }
 
-// Get checkout session status
-export async function getCheckoutSession(sessionId: string): Promise<{ status: string; listingId?: string }> {
-  const url = `${API_BASE_URL}/api/payments/session/${sessionId}`;
+// Confirm payment and publish listing
+export async function confirmPayment(
+  accessToken: string,
+  paymentIntentId: string
+): Promise<{ success: boolean; listingSlug?: string }> {
+  const url = `${API_BASE_URL}/api/payments/confirm`;
 
   const res = await fetch(url, {
+    method: 'POST',
     headers: {
+      'Authorization': `Bearer ${accessToken}`,
       'Content-Type': 'application/json',
     },
+    body: JSON.stringify({
+      payment_intent_id: paymentIntentId,
+    }),
   });
 
   if (!res.ok) {
-    throw new Error('Failed to get session status');
+    const error = await res.json().catch(() => ({}));
+    throw new Error(error.error || 'Failed to confirm payment');
   }
 
   const data = await res.json();
   return {
-    status: data.status,
-    listingId: data.listing_id,
+    success: data.success,
+    listingSlug: data.listing_slug,
   };
 }
