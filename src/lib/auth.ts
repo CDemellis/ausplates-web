@@ -163,7 +163,14 @@ export async function getCurrentUser(accessToken: string): Promise<User> {
     throw new Error(data.error || 'Failed to get user');
   }
 
-  return data;
+  // Transform snake_case to camelCase
+  return {
+    id: data.id,
+    email: data.email,
+    fullName: data.full_name,
+    avatarUrl: data.avatar_url,
+    emailVerified: data.email_verified,
+  };
 }
 
 // Sign out
