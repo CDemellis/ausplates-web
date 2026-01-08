@@ -101,11 +101,11 @@ export function PhotoGallery({ photos, combination }: PhotoGalleryProps) {
             </div>
 
             {/* Image */}
-            <div className="flex-1 flex items-center justify-center bg-[var(--background-subtle)] overflow-hidden">
+            <div className="flex-1 flex items-center justify-center bg-[var(--background-subtle)] overflow-hidden p-6">
               <img
                 src={photos[selectedIndex]}
                 alt={`${combination} photo ${selectedIndex + 1}`}
-                className="max-w-full max-h-[60vh] object-contain"
+                className="max-w-full max-h-[55vh] object-contain rounded-lg"
               />
             </div>
 
