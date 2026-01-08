@@ -20,6 +20,8 @@ interface APIListing {
   size_format?: PlateSizeFormat;  // Legacy
   size_formats?: PlateSizeFormat[];
   photo_urls?: string[];
+  // Photos from listing_photos table (iOS app uses this)
+  photos?: { id: string; url: string; order: number }[];
   created_at: string;
   updated_at: string;
   seller?: {
@@ -43,6 +45,13 @@ interface APIListingsResponse {
 
 // Transform API response to frontend format
 function transformListing(api: APIListing): Listing {
+  // Merge photos from both sources:
+  // 1. photo_urls column (web uploads)
+  // 2. photos from listing_photos table (iOS app uploads)
+  const photoUrlsFromColumn = api.photo_urls || [];
+  const photoUrlsFromTable = (api.photos || []).map(p => p.url);
+  const allPhotoUrls = [...new Set([...photoUrlsFromColumn, ...photoUrlsFromTable])];
+
   return {
     id: api.id,
     slug: api.slug,
@@ -58,7 +67,7 @@ function transformListing(api: APIListing): Listing {
     sellerId: api.user_id,
     colorScheme: api.color_scheme,
     sizeFormats: api.size_formats || [],
-    photoUrls: api.photo_urls || [],
+    photoUrls: allPhotoUrls,
     createdAt: api.created_at,
     updatedAt: api.updated_at,
   };

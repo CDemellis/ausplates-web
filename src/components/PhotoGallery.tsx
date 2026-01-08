@@ -37,7 +37,6 @@ export function PhotoGallery({ photos, combination }: PhotoGalleryProps) {
     };
 
     document.addEventListener('keydown', handleKeyDown);
-    // Prevent body scroll when modal is open
     document.body.style.overflow = 'hidden';
 
     return () => {
@@ -71,69 +70,87 @@ export function PhotoGallery({ photos, combination }: PhotoGalleryProps) {
         </div>
       </div>
 
-      {/* Lightbox Modal */}
+      {/* Modal */}
       {selectedIndex !== null && (
         <div
-          className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
           onClick={closeModal}
           role="dialog"
           aria-modal="true"
-          aria-label="Photo lightbox"
+          aria-label="Photo viewer"
         >
-          {/* Close button */}
-          <button
-            onClick={closeModal}
-            className="absolute top-4 right-4 p-2 text-white/80 hover:text-white transition-colors z-10"
-            aria-label="Close lightbox"
-          >
-            <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-
-          {/* Previous button */}
-          {selectedIndex > 0 && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                goToPrevious();
-              }}
-              className="absolute left-4 p-2 text-white/80 hover:text-white transition-colors"
-              aria-label="Previous photo"
-            >
-              <svg className="w-10 h-10" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-              </svg>
-            </button>
-          )}
-
-          {/* Next button */}
-          {selectedIndex < photos.length - 1 && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                goToNext();
-              }}
-              className="absolute right-4 p-2 text-white/80 hover:text-white transition-colors"
-              aria-label="Next photo"
-            >
-              <svg className="w-10 h-10" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-              </svg>
-            </button>
-          )}
-
-          {/* Image */}
-          <img
-            src={photos[selectedIndex]}
-            alt={`${combination} photo ${selectedIndex + 1}`}
-            className="max-h-[90vh] max-w-[90vw] object-contain"
+          {/* Modal Container */}
+          <div
+            className="relative bg-white rounded-2xl overflow-hidden shadow-xl max-w-3xl w-full max-h-[80vh] flex flex-col"
             onClick={(e) => e.stopPropagation()}
-          />
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border)]">
+              <span className="text-sm text-[var(--text-secondary)]">
+                {selectedIndex + 1} of {photos.length}
+              </span>
+              <button
+                onClick={closeModal}
+                className="p-1 text-[var(--text-muted)] hover:text-[var(--text)] transition-colors"
+                aria-label="Close"
+              >
+                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
 
-          {/* Counter */}
-          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 text-white/80 text-sm">
-            {selectedIndex + 1} / {photos.length}
+            {/* Image */}
+            <div className="flex-1 flex items-center justify-center bg-[var(--background-subtle)] overflow-hidden">
+              <img
+                src={photos[selectedIndex]}
+                alt={`${combination} photo ${selectedIndex + 1}`}
+                className="max-w-full max-h-[60vh] object-contain"
+              />
+            </div>
+
+            {/* Navigation */}
+            {photos.length > 1 && (
+              <div className="flex items-center justify-center gap-4 px-4 py-3 border-t border-[var(--border)]">
+                <button
+                  onClick={goToPrevious}
+                  disabled={selectedIndex === 0}
+                  className="p-2 rounded-lg text-[var(--text-secondary)] hover:bg-[var(--background-subtle)] disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                  aria-label="Previous photo"
+                >
+                  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                  </svg>
+                </button>
+
+                {/* Dots */}
+                <div className="flex gap-1.5">
+                  {photos.map((_, index) => (
+                    <button
+                      key={index}
+                      onClick={() => setSelectedIndex(index)}
+                      className={`w-2 h-2 rounded-full transition-colors ${
+                        index === selectedIndex
+                          ? 'bg-[var(--green)]'
+                          : 'bg-[var(--border)] hover:bg-[var(--text-muted)]'
+                      }`}
+                      aria-label={`Go to photo ${index + 1}`}
+                    />
+                  ))}
+                </div>
+
+                <button
+                  onClick={goToNext}
+                  disabled={selectedIndex === photos.length - 1}
+                  className="p-2 rounded-lg text-[var(--text-secondary)] hover:bg-[var(--background-subtle)] disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                  aria-label="Next photo"
+                >
+                  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}
