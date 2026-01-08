@@ -97,6 +97,15 @@ export function QRLogin({ onSuccess }: Props) {
 
         const authData = await exchangeRes.json();
 
+        // Transform snake_case to camelCase for user object
+        const user: User = {
+          id: authData.user.id,
+          email: authData.user.email,
+          fullName: authData.user.full_name,
+          avatarUrl: authData.user.avatar_url,
+          emailVerified: authData.user.email_verified,
+        };
+
         // Save tokens and update auth context
         const sessionData: Session = {
           accessToken: authData.session.accessToken,
@@ -104,7 +113,7 @@ export function QRLogin({ onSuccess }: Props) {
           expiresAt: authData.session.expiresAt,
         };
 
-        setUserFromSignIn(authData.user, sessionData);
+        setUserFromSignIn(user, sessionData);
 
         if (onSuccess) {
           onSuccess();
