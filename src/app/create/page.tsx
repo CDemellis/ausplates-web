@@ -824,6 +824,7 @@ export default function CreateListingPage() {
 
   // Payment state
   const [isCreatingListing, setIsCreatingListing] = useState(false);
+  const [isConfirmingPayment, setIsConfirmingPayment] = useState(false);
   const [listingId, setListingId] = useState<string | null>(null);
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [paymentAmount, setPaymentAmount] = useState(0);
@@ -949,6 +950,9 @@ export default function CreateListingPage() {
 
   // Step 2: Confirm payment and publish listing
   const handlePaymentSuccess = async (paymentIntentId: string) => {
+    setIsConfirmingPayment(true);
+    setSubmitError(null);
+
     try {
       const token = await getAccessToken();
       if (!token) {
@@ -966,11 +970,14 @@ export default function CreateListingPage() {
     } catch (error) {
       console.error('Payment confirmation error:', error);
       setSubmitError(error instanceof Error ? error.message : 'Failed to confirm payment');
+      setIsConfirmingPayment(false);
+      setClientSecret(null); // Reset to show options again
     }
   };
 
   const handlePaymentError = (error: string) => {
     setSubmitError(error);
+    setClientSecret(null); // Reset to show options again
   };
 
   // Loading state
@@ -978,6 +985,19 @@ export default function CreateListingPage() {
     return (
       <div className="min-h-screen bg-[var(--background)] flex items-center justify-center">
         <div className="w-8 h-8 border-4 border-[var(--green)] border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  // Payment confirmation in progress - full screen overlay
+  if (isConfirmingPayment) {
+    return (
+      <div className="min-h-screen bg-[var(--background)] flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-[var(--green)] border-t-transparent rounded-full animate-spin mx-auto mb-6" />
+          <h2 className="text-xl font-semibold text-[var(--text)] mb-2">Payment Successful!</h2>
+          <p className="text-[var(--text-secondary)]">Publishing your listing...</p>
+        </div>
       </div>
     );
   }
