@@ -3,6 +3,7 @@ import { Geist, Geist_Mono, Bebas_Neue } from 'next/font/google';
 import { Header } from '@/components/Header';
 import { Footer } from '@/components/Footer';
 import { AuthProvider } from '@/lib/auth-context';
+import { SavedProvider } from '@/lib/saved-context';
 import './globals.css';
 
 const geistSans = Geist({
@@ -72,9 +73,11 @@ export default function RootLayout({
     <html lang="en">
       <body className={`${geistSans.variable} ${geistMono.variable} ${bebasNeue.variable} antialiased`}>
         <AuthProvider>
-          <Header />
-          <main className="min-h-screen">{children}</main>
-          <Footer />
+          <SavedProvider>
+            <Header />
+            <main className="min-h-screen">{children}</main>
+            <Footer />
+          </SavedProvider>
         </AuthProvider>
       </body>
     </html>

@@ -221,3 +221,43 @@ export async function getSavedListings(accessToken: string): Promise<Listing[]> 
   const data: { data: APIListing[] } = await res.json();
   return (data.data || []).map(transformListing);
 }
+
+// Save a listing
+export async function saveListing(accessToken: string, listingId: string): Promise<void> {
+  const url = `${API_BASE_URL}/api/listings/${listingId}/save`;
+
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+  });
+
+  if (!res.ok) {
+    throw new Error('Failed to save listing');
+  }
+}
+
+// Unsave a listing
+export async function unsaveListing(accessToken: string, listingId: string): Promise<void> {
+  const url = `${API_BASE_URL}/api/listings/${listingId}/save`;
+
+  const res = await fetch(url, {
+    method: 'DELETE',
+    headers: {
+      'Authorization': `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+  });
+
+  if (!res.ok) {
+    throw new Error('Failed to unsave listing');
+  }
+}
+
+// Get saved listing IDs for checking saved status
+export async function getSavedListingIds(accessToken: string): Promise<Set<string>> {
+  const listings = await getSavedListings(accessToken);
+  return new Set(listings.map(l => l.id));
+}
