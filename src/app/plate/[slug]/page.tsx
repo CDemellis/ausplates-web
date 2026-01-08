@@ -10,6 +10,7 @@ import {
 } from '@/types/listing';
 import { PlateFeatureTags } from '@/components/PlateFeatureTags';
 import { PlateView } from '@/components/PlateView';
+import { SaveButton } from '@/components/SaveButton';
 
 interface PageProps {
   params: Promise<{ slug: string }>;
@@ -21,9 +22,14 @@ const CONTAINER_COLOR = '#F0F0F0';
 function PlateHero({ listing }: { listing: any }) {
   return (
     <div
-      className="rounded-2xl p-8 md:p-12 flex flex-col items-center justify-center min-h-[300px]"
+      className="relative rounded-2xl p-8 md:p-12 flex flex-col items-center justify-center min-h-[300px]"
       style={{ backgroundColor: CONTAINER_COLOR }}
     >
+      {/* Save Button */}
+      <div className="absolute top-4 left-4">
+        <SaveButton listingId={listing.id} slug={listing.slug} size="small" />
+      </div>
+
       {listing.isFeatured && (
         <span className="inline-flex items-center gap-1 px-2 py-1 mb-6 bg-[var(--gold)] text-[var(--text)] text-xs font-semibold tracking-wide rounded">
           <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
@@ -210,6 +216,11 @@ export default async function ListingDetailPage({ params }: PageProps) {
                   </p>
                 </div>
               )}
+
+              {/* Save Button */}
+              <div className="mb-6">
+                <SaveButton listingId={listing.id} slug={listing.slug} size="large" />
+              </div>
 
               {/* App CTA */}
               <div className="bg-[var(--background-subtle)] rounded-2xl p-6">
