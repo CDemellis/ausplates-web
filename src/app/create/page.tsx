@@ -1035,6 +1035,9 @@ function CreateListingContent() {
         draft.promoCode || undefined
       );
 
+      // Debug: log the API response
+      console.log('Checkout result:', checkoutResult);
+
       // If free (promo code covered full amount), redirect to listing
       if (checkoutResult.free && checkoutResult.listingSlug) {
         localStorage.removeItem(STORAGE_KEY);
