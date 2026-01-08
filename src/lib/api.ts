@@ -926,6 +926,7 @@ export interface UpdateListingData {
   isOpenToOffers?: boolean;
   description?: string;
   status?: 'draft' | 'active' | 'sold';
+  photoUrls?: string[];
 }
 
 export async function updateListing(
@@ -947,6 +948,7 @@ export async function updateListing(
   if (data.isOpenToOffers !== undefined) apiData.is_open_to_offers = data.isOpenToOffers;
   if (data.description !== undefined) apiData.description = data.description;
   if (data.status !== undefined) apiData.status = data.status;
+  if (data.photoUrls !== undefined) apiData.photo_urls = data.photoUrls;
 
   const res = await fetch(url, {
     method: 'PATCH',

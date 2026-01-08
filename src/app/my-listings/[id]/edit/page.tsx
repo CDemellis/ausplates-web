@@ -64,6 +64,13 @@ interface ListingForm {
   price: number;
   isOpenToOffers: boolean;
   description: string;
+  photos: string[];
+}
+
+interface PhotoUpload {
+  file: File;
+  preview: string;
+  uploading: boolean;
 }
 
 export default function EditListingPage({ params }: PageProps) {
@@ -88,7 +95,10 @@ export default function EditListingPage({ params }: PageProps) {
     price: 0,
     isOpenToOffers: true,
     description: '',
+    photos: [],
   });
+  const [newPhotos, setNewPhotos] = useState<PhotoUpload[]>([]);
+  const [isUploadingPhotos, setIsUploadingPhotos] = useState(false);
 
   const [originalSlug, setOriginalSlug] = useState<string>('');
 
@@ -144,6 +154,7 @@ export default function EditListingPage({ params }: PageProps) {
           price: listing.price / 100, // Convert from cents
           isOpenToOffers: listing.is_open_to_offers ?? true,
           description: listing.description || '',
+          photos: listing.photo_urls || [],
         });
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load listing');
@@ -165,8 +176,25 @@ export default function EditListingPage({ params }: PageProps) {
       const token = await getAccessToken();
       if (!token) throw new Error('Not authenticated');
 
+      // Upload any new photos first
+      let allPhotoUrls = [...form.photos];
+      if (newPhotos.length > 0) {
+        setIsUploadingPhotos(true);
+        const { uploadPhoto } = await import('@/lib/api');
+        for (const photo of newPhotos) {
+          try {
+            const result = await uploadPhoto(token, photo.file, id);
+            allPhotoUrls.push(result.url);
+          } catch (uploadErr) {
+            console.error('Failed to upload photo:', uploadErr);
+          }
+        }
+        setIsUploadingPhotos(false);
+      }
+
+      // Note: combination is NOT included - it cannot be changed after listing creation
+      // This prevents URL/slug changes for SEO and abuse prevention
       const updateData: UpdateListingData = {
-        combination: form.combination,
         state: form.state,
         plateType: form.plateType,
         colorScheme: form.colorScheme,
@@ -176,6 +204,7 @@ export default function EditListingPage({ params }: PageProps) {
         price: form.price * 100, // Convert to cents
         isOpenToOffers: form.isOpenToOffers,
         description: form.description,
+        photoUrls: allPhotoUrls.length > 0 ? allPhotoUrls : undefined,
       };
 
       await updateListing(token, id, updateData);
@@ -189,6 +218,7 @@ export default function EditListingPage({ params }: PageProps) {
       setError(err instanceof Error ? err.message : 'Failed to update listing');
     } finally {
       setIsSaving(false);
+      setIsUploadingPhotos(false);
     }
   };
 
@@ -258,9 +288,13 @@ export default function EditListingPage({ params }: PageProps) {
                     <input
                       type="text"
                       value={form.combination}
-                      onChange={(e) => setForm({ ...form, combination: e.target.value.toUpperCase().slice(0, 10) })}
-                      className="w-full px-4 py-3 text-xl font-mono tracking-wider uppercase border border-[var(--border)] rounded-xl focus:outline-none focus:ring-2 focus:ring-[var(--green)]"
+                      disabled
+                      className="w-full px-4 py-3 text-xl font-mono tracking-wider uppercase border border-[var(--border)] rounded-xl bg-[var(--background-subtle)] text-[var(--text-secondary)] cursor-not-allowed"
+                      aria-describedby="combination-note"
                     />
+                    <p id="combination-note" className="mt-1 text-sm text-[var(--text-muted)]">
+                      Plate combination cannot be changed after listing creation
+                    </p>
                   </div>
 
                   <div>
@@ -464,6 +498,109 @@ export default function EditListingPage({ params }: PageProps) {
                 </div>
               </section>
 
+              {/* Photos */}
+              <section className="bg-white rounded-2xl border border-[var(--border)] p-6">
+                <h2 className="text-lg font-semibold text-[var(--text)] mb-4">Photos</h2>
+
+                <div className="space-y-4">
+                  {/* Existing photos */}
+                  {form.photos.length > 0 && (
+                    <div>
+                      <p className="text-sm text-[var(--text-secondary)] mb-2">Current photos</p>
+                      <div className="grid grid-cols-3 gap-2">
+                        {form.photos.map((url, index) => (
+                          <div key={index} className="relative aspect-square rounded-lg overflow-hidden bg-[var(--background-subtle)]">
+                            <img src={url} alt={`Photo ${index + 1}`} className="w-full h-full object-cover" />
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const updated = form.photos.filter((_, i) => i !== index);
+                                setForm({ ...form, photos: updated });
+                              }}
+                              className="absolute top-1 right-1 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600"
+                              aria-label={`Remove photo ${index + 1}`}
+                            >
+                              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                              </svg>
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* New photos to upload */}
+                  {newPhotos.length > 0 && (
+                    <div>
+                      <p className="text-sm text-[var(--text-secondary)] mb-2">New photos (will upload on save)</p>
+                      <div className="grid grid-cols-3 gap-2">
+                        {newPhotos.map((photo, index) => (
+                          <div key={index} className="relative aspect-square rounded-lg overflow-hidden bg-[var(--background-subtle)]">
+                            <img src={photo.preview} alt={`New photo ${index + 1}`} className="w-full h-full object-cover" />
+                            <button
+                              type="button"
+                              onClick={() => {
+                                URL.revokeObjectURL(photo.preview);
+                                setNewPhotos(newPhotos.filter((_, i) => i !== index));
+                              }}
+                              className="absolute top-1 right-1 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600"
+                              aria-label={`Remove new photo ${index + 1}`}
+                            >
+                              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                              </svg>
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Add photos button */}
+                  {form.photos.length + newPhotos.length < 5 && (
+                    <div>
+                      <input
+                        type="file"
+                        id="photo-upload"
+                        accept="image/jpeg,image/png,image/webp"
+                        multiple
+                        onChange={(e) => {
+                          const files = Array.from(e.target.files || []);
+                          const remaining = 5 - form.photos.length - newPhotos.length;
+                          const toAdd = files.slice(0, remaining);
+
+                          const newUploads: PhotoUpload[] = toAdd.map(file => ({
+                            file,
+                            preview: URL.createObjectURL(file),
+                            uploading: false,
+                          }));
+
+                          setNewPhotos([...newPhotos, ...newUploads]);
+                          e.target.value = '';
+                        }}
+                        className="hidden"
+                      />
+                      <label
+                        htmlFor="photo-upload"
+                        className="flex items-center justify-center gap-2 px-4 py-3 border-2 border-dashed border-[var(--border)] rounded-xl cursor-pointer hover:border-[var(--green)] transition-colors"
+                      >
+                        <svg className="w-5 h-5 text-[var(--text-muted)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                        </svg>
+                        <span className="text-sm text-[var(--text-secondary)]">
+                          Add photos ({5 - form.photos.length - newPhotos.length} remaining)
+                        </span>
+                      </label>
+                    </div>
+                  )}
+
+                  <p className="text-sm text-[var(--text-muted)]">
+                    Up to 5 photos. Supported formats: JPEG, PNG, WebP. Max 5MB each.
+                  </p>
+                </div>
+              </section>
+
               {/* Error/Success Messages */}
               {error && (
                 <div className="p-4 bg-red-50 border border-red-200 rounded-xl">
@@ -480,10 +617,10 @@ export default function EditListingPage({ params }: PageProps) {
               {/* Submit Button */}
               <button
                 type="submit"
-                disabled={isSaving || !form.combination || form.price < 100}
+                disabled={isSaving || isUploadingPhotos || !form.combination || form.price < 100}
                 className="w-full py-4 bg-[var(--green)] text-white text-lg font-semibold rounded-xl hover:bg-[#006B31] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
-                {isSaving ? 'Saving...' : 'Save Changes'}
+                {isUploadingPhotos ? 'Uploading photos...' : isSaving ? 'Saving...' : 'Save Changes'}
               </button>
             </form>
           </div>
