@@ -1,9 +1,13 @@
+'use client';
+
 import Link from 'next/link';
 import { MobileMenu } from './MobileMenu';
+import { useAuth } from '@/lib/auth-context';
 
 const STATES = ['VIC', 'NSW', 'QLD', 'SA', 'WA', 'TAS', 'NT', 'ACT'] as const;
 
 export function Header() {
+  const { user, isAuthenticated, isLoading } = useAuth();
   return (
     <header className="sticky top-0 z-50 bg-white border-b border-[var(--border-subtle)]">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -34,8 +38,29 @@ export function Header() {
             ))}
           </nav>
 
-          {/* CTA */}
+          {/* CTA / User Menu */}
           <div className="flex items-center gap-4">
+            {!isLoading && isAuthenticated && user ? (
+              <Link
+                href="/profile"
+                className="hidden md:flex items-center gap-2 px-3 py-2 rounded-xl hover:bg-gray-100 transition-colors"
+              >
+                <div className="w-8 h-8 rounded-full bg-[var(--green)]/10 flex items-center justify-center">
+                  <span className="text-sm font-semibold text-[var(--green)]">
+                    {user.fullName.charAt(0).toUpperCase()}
+                  </span>
+                </div>
+                <span className="text-sm font-medium text-[var(--text)]">{user.fullName.split(' ')[0]}</span>
+              </Link>
+            ) : !isLoading ? (
+              <Link
+                href="/signin"
+                className="hidden md:inline-flex items-center px-4 py-2 text-sm font-medium text-[var(--text-secondary)] hover:text-[var(--text)] transition-colors"
+              >
+                Sign In
+              </Link>
+            ) : null}
+
             <Link
               href="https://apps.apple.com/app/ausplates"
               target="_blank"
