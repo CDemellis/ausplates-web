@@ -115,10 +115,14 @@ export function QRLogin({ onSuccess }: Props) {
 
         setUserFromSignIn(user, sessionData);
 
+        // Small delay to ensure state is updated before navigation
+        await new Promise(resolve => setTimeout(resolve, 100));
+
         if (onSuccess) {
           onSuccess();
         } else {
-          router.push('/');
+          // Use window.location for more reliable redirect
+          window.location.href = '/';
         }
         return;
       }

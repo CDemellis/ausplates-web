@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useState } from 'react';
+import { Suspense, useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
@@ -65,7 +65,7 @@ function QRLoginButton({ onClick }: { onClick: () => void }) {
 function SignInForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { signIn } = useAuth();
+  const { signIn, isAuthenticated, isLoading: authLoading } = useAuth();
 
   const [method, setMethod] = useState<SignInMethod>('credentials');
   const [email, setEmail] = useState('');
@@ -75,6 +75,13 @@ function SignInForm() {
   const [showResendVerification, setShowResendVerification] = useState(false);
 
   const redirect = searchParams.get('redirect') || '/';
+
+  // Redirect if already authenticated
+  useEffect(() => {
+    if (!authLoading && isAuthenticated) {
+      router.push(redirect);
+    }
+  }, [authLoading, isAuthenticated, redirect, router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -100,7 +107,7 @@ function SignInForm() {
   if (method === 'qr') {
     return (
       <div className="space-y-6">
-        <QRLogin onSuccess={() => router.push(redirect)} />
+        <QRLogin onSuccess={() => window.location.href = redirect} />
 
         {/* Back to credentials */}
         <div className="text-center">
