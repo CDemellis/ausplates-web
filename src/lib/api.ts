@@ -146,7 +146,7 @@ export async function getListings(params: ListingsParams = {}): Promise<{ listin
 
   const url = `${API_BASE_URL}/api/listings?${searchParams.toString()}`;
 
-  const res = await fetch(url, { next: { revalidate: 60 } });
+  const res = await fetch(url, { next: { revalidate: 30 } });
 
   if (!res.ok) {
     throw new Error('Failed to fetch listings');
@@ -163,7 +163,7 @@ export async function getListings(params: ListingsParams = {}): Promise<{ listin
 export async function getFeaturedListings(): Promise<Listing[]> {
   const url = `${API_BASE_URL}/api/listings/featured`;
 
-  const res = await fetch(url, { next: { revalidate: 60 } });
+  const res = await fetch(url, { next: { revalidate: 30 } });
 
   if (!res.ok) {
     throw new Error('Failed to fetch featured listings');
@@ -176,7 +176,7 @@ export async function getFeaturedListings(): Promise<Listing[]> {
 export async function getRecentListings(limit = 12): Promise<Listing[]> {
   const url = `${API_BASE_URL}/api/listings/recent?limit=${limit}`;
 
-  const res = await fetch(url, { next: { revalidate: 60 } });
+  const res = await fetch(url, { next: { revalidate: 30 } });
 
   if (!res.ok) {
     throw new Error('Failed to fetch recent listings');
@@ -189,7 +189,7 @@ export async function getRecentListings(limit = 12): Promise<Listing[]> {
 export async function getListingBySlug(slug: string): Promise<ListingWithSeller | null> {
   const url = `${API_BASE_URL}/api/listings/${slug}`;
 
-  const res = await fetch(url, { next: { revalidate: 60 } });
+  const res = await fetch(url, { next: { revalidate: 15 } });
 
   if (res.status === 404) {
     return null;
