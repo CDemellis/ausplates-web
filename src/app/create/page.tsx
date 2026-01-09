@@ -81,7 +81,7 @@ const INITIAL_DRAFT: ListingDraft = {
   sizeFormats: ['standard', 'standard'],
   material: 'aluminium',
   vehicleType: 'car',
-  contactPreference: 'messaging',
+  contactPreference: 'in_app_only',
   price: 0,
   isOpenToOffers: true,
   description: '',
@@ -913,9 +913,9 @@ function Step2Details({
                   onChange={(e) => onChange({ contactPreference: e.target.value as ContactPreference })}
                   className="w-full px-3 py-2 border border-[var(--border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--green)]"
                 >
-                  <option value="messaging">In-app messaging</option>
-                  <option value="phone">Phone</option>
-                  <option value="email">Email</option>
+                  <option value="in_app_only">In-app messaging only</option>
+                  <option value="phone_ok">Phone calls OK</option>
+                  <option value="email_ok">Email OK</option>
                 </select>
               </div>
             </div>

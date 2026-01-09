@@ -88,7 +88,7 @@ export type PlateSizeFormat =
 
 export type VehicleType = 'car' | 'motorcycle' | 'trailer';
 
-export type ContactPreference = 'messaging' | 'phone' | 'email';
+export type ContactPreference = 'in_app_only' | 'phone_ok' | 'email_ok';
 
 export interface Listing {
   id: string;
