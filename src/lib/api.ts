@@ -267,8 +267,8 @@ export async function getSavedListings(accessToken: string): Promise<Listing[]> 
     throw new Error('Failed to fetch saved listings');
   }
 
-  const data: { data: APIListing[] } = await res.json();
-  return (data.data || []).map(transformListing);
+  const data: APIListing[] = await res.json();
+  return (data || []).map(transformListing);
 }
 
 // Save a listing
