@@ -639,7 +639,6 @@ export async function createListing(accessToken: string, data: CreateListingData
 
   if (!res.ok) {
     const errorData = await res.json().catch(() => ({}));
-    console.error('Create listing API error:', { status: res.status, errorData, apiData });
     // Handle Zod validation errors (nested object) or simple string errors
     const errorMessage = typeof errorData.error === 'string'
       ? errorData.error
