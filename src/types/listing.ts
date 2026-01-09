@@ -88,6 +88,8 @@ export type PlateSizeFormat =
 
 export type VehicleType = 'car' | 'motorcycle' | 'trailer';
 
+export type ContactPreference = 'messaging' | 'phone' | 'email';
+
 export interface Listing {
   id: string;
   slug: string;

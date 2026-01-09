@@ -1,16 +1,14 @@
 'use client';
 
-import { useState, useEffect, useCallback, Suspense } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useState, useEffect, useCallback, useRef, Suspense } from 'react';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import Image from 'next/image';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { useAuth } from '@/lib/auth-context';
 import { PlateView } from '@/components/PlateView';
-import { createListing, createCheckout, confirmPayment } from '@/lib/api';
-
-// Initialize Stripe
-const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || '');
+import { createListing, createCheckout, confirmPayment, uploadPhoto, deletePhoto } from '@/lib/api';
 
 import {
   AustralianState,
@@ -19,6 +17,7 @@ import {
   PlateSizeFormat,
   PlateMaterial,
   VehicleType,
+  ContactPreference,
   PLATE_TYPE_NAMES,
   SIZE_FORMAT_NAMES,
   PLATE_MATERIAL_NAMES,
@@ -26,31 +25,55 @@ import {
 } from '@/types/listing';
 
 // ============================================
+// STRIPE SETUP
+// ============================================
+
+const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || '');
+
+// ============================================
 // TYPES
 // ============================================
 
+type Step = 'plan' | 'details' | 'pay';
+type BoostType = 'none' | '7day' | '30day';
+
 interface ListingDraft {
-  // Step 1: Plate Details
+  step: Step;
+  boostType: BoostType;
+  // Plate Details
   combination: string;
   state: AustralianState | null;
   plateType: PlateType | null;
-  // Step 2: Appearance
   colorScheme: PlateColorScheme;
+  // Optional Details (collapsible section)
   sizeFormats: [PlateSizeFormat, PlateSizeFormat];
   material: PlateMaterial;
   vehicleType: VehicleType;
-  // Step 3: Pricing & Details
-  price: number; // in dollars for input, converted to cents on submit
+  contactPreference: ContactPreference;
+  // Pricing
+  price: number;
   isOpenToOffers: boolean;
   description: string;
-  // Step 4: Photos
-  photos: string[]; // URLs after upload
-  // Step 5: Review & Pay
+  // Photos
+  photos: string[];
+  // Promo
   promoCode: string;
-  boostType: 'none' | '7day' | '30day';
+  // Timestamp
+  savedAt: number;
+}
+
+interface FormErrors {
+  combination?: string;
+  state?: string;
+  plateType?: string;
+  price?: string;
+  description?: string;
+  photos?: string;
 }
 
 const INITIAL_DRAFT: ListingDraft = {
+  step: 'plan',
+  boostType: 'none',
   combination: '',
   state: null,
   plateType: null,
@@ -58,15 +81,17 @@ const INITIAL_DRAFT: ListingDraft = {
   sizeFormats: ['standard', 'standard'],
   material: 'aluminium',
   vehicleType: 'car',
+  contactPreference: 'messaging',
   price: 0,
   isOpenToOffers: true,
   description: '',
   photos: [],
   promoCode: '',
-  boostType: 'none',
+  savedAt: Date.now(),
 };
 
 const STORAGE_KEY = 'ausplates_listing_draft';
+const DRAFT_EXPIRY_DAYS = 7;
 
 // ============================================
 // CONSTANTS
@@ -74,7 +99,11 @@ const STORAGE_KEY = 'ausplates_listing_draft';
 
 const STATES: AustralianState[] = ['VIC', 'NSW', 'QLD', 'SA', 'WA', 'TAS', 'NT', 'ACT'];
 
-const PLATE_TYPES: PlateType[] = [
+const COMMON_PLATE_TYPES: PlateType[] = [
+  'custom', 'heritage', 'euro', 'standard', 'slimline', 'prestige',
+];
+
+const ALL_PLATE_TYPES: PlateType[] = [
   'custom', 'heritage', 'euro', 'standard', 'slimline', 'numeric',
   'prestige', 'deluxe', 'liquid_metal', 'frameless', 'signature',
   'afl_team', 'fishing', 'business', 'sequential', 'car_brand',
@@ -86,440 +115,364 @@ const SIZE_FORMATS: PlateSizeFormat[] = [
 
 const MATERIALS: PlateMaterial[] = ['aluminium', 'acrylic', 'polycarbonate', 'enamel'];
 
-const COMMON_COLOR_SCHEMES: PlateColorScheme[] = [
+const COMMON_COLORS: PlateColorScheme[] = [
   'white_on_black', 'black_on_white', 'blue_on_white', 'black_on_yellow',
-  'silver_on_black', 'gold_on_black', 'yellow_on_black', 'green_on_white',
+  'silver_on_black', 'gold_on_black',
 ];
 
-const ALL_COLOR_SCHEMES: PlateColorScheme[] = [
-  ...COMMON_COLOR_SCHEMES,
-  'maroon_on_white', 'white_on_blue', 'white_on_maroon',
+const ALL_COLORS: PlateColorScheme[] = [
+  ...COMMON_COLORS,
+  'yellow_on_black', 'green_on_white', 'maroon_on_white',
   'red_on_white', 'pink_on_white', 'purple_on_white',
-  'orange_on_white', 'grey_on_black', 'teal_on_white', 'ocean_blue_on_white',
-  'sky_blue_on_white', 'navy_on_white', 'lime_on_white', 'forest_green_on_white',
-  'burgundy_on_white', 'fire_red_on_white', 'charcoal_on_white', 'brown_on_white',
-  'tan_on_black', 'cream_on_black', 'off_white_on_black',
-  'matte_black_on_white', 'matte_white_on_black',
+  'orange_on_white', 'grey_on_black', 'teal_on_white',
+  'ocean_blue_on_white', 'sky_blue_on_white', 'navy_on_white',
 ];
 
-const COLOR_SCHEME_NAMES: Record<string, string> = {
-  white_on_black: 'White on Black',
-  black_on_white: 'Black on White',
-  blue_on_white: 'Blue on White',
-  black_on_yellow: 'Black on Yellow',
-  silver_on_black: 'Silver on Black',
-  gold_on_black: 'Gold on Black',
-  yellow_on_black: 'Yellow on Black',
-  green_on_white: 'Green on White',
-  maroon_on_white: 'Maroon on White',
-  white_on_blue: 'White on Blue',
-  white_on_maroon: 'White on Maroon',
-  red_on_white: 'Red on White',
-  pink_on_white: 'Pink on White',
-  purple_on_white: 'Purple on White',
-  orange_on_white: 'Orange on White',
-  grey_on_black: 'Grey on Black',
-  teal_on_white: 'Teal on White',
-  ocean_blue_on_white: 'Ocean Blue',
-  sky_blue_on_white: 'Sky Blue',
-  navy_on_white: 'Navy on White',
-  lime_on_white: 'Lime on White',
-  forest_green_on_white: 'Forest Green',
-  burgundy_on_white: 'Burgundy',
-  fire_red_on_white: 'Fire Red',
-  charcoal_on_white: 'Charcoal',
-  brown_on_white: 'Brown on White',
-  tan_on_black: 'Tan on Black',
-  cream_on_black: 'Cream on Black',
-  off_white_on_black: 'Off White',
-  matte_black_on_white: 'Matte Black',
-  matte_white_on_black: 'Matte White',
+const TIER_PRICES = {
+  none: 999,     // $9.99
+  '7day': 1998,  // $19.98
+  '30day': 2499, // $24.99
+} as const;
+
+const TIER_INFO: Record<BoostType, { name: string; features: string[] }> = {
+  none: {
+    name: 'Standard',
+    features: ['Listed until sold', 'Secure messaging'],
+  },
+  '7day': {
+    name: 'Boost',
+    features: ['Featured 7 days', 'Priority search', 'Homepage spotlight'],
+  },
+  '30day': {
+    name: 'Boost Pro',
+    features: ['Featured 30 days', 'Priority search', '2x Bump to top'],
+  },
 };
 
-const STEPS = [
-  { id: 1, name: 'Plate Details', shortName: 'Details' },
-  { id: 2, name: 'Appearance', shortName: 'Style' },
-  { id: 3, name: 'Pricing', shortName: 'Price' },
-  { id: 4, name: 'Photos', shortName: 'Photos' },
-  { id: 5, name: 'Review & Pay', shortName: 'Pay' },
-];
+const MAX_PHOTOS = 5;
 
 // ============================================
-// STEP COMPONENTS
+// HELPER COMPONENTS
 // ============================================
 
-function StepIndicator({ currentStep, onStepClick }: { currentStep: number; onStepClick: (step: number) => void }) {
-  return (
-    <nav aria-label="Progress" className="mb-8">
-      <ol className="flex items-center justify-between">
-        {STEPS.map((step, index) => (
-          <li key={step.id} className="relative flex-1">
-            {index > 0 && (
-              <div
-                className={`absolute left-0 top-4 -translate-y-1/2 w-full h-0.5 -ml-1/2 ${
-                  step.id <= currentStep ? 'bg-[var(--green)]' : 'bg-[var(--border)]'
-                }`}
-                style={{ width: 'calc(100% - 2rem)', left: '-50%', marginLeft: '1rem' }}
-              />
-            )}
-            <button
-              onClick={() => step.id < currentStep && onStepClick(step.id)}
-              disabled={step.id > currentStep}
-              className={`relative flex flex-col items-center group ${
-                step.id > currentStep ? 'cursor-not-allowed' : 'cursor-pointer'
-              }`}
-              aria-current={step.id === currentStep ? 'step' : undefined}
-            >
-              <span
-                className={`w-8 h-8 flex items-center justify-center rounded-full text-sm font-semibold transition-colors ${
-                  step.id < currentStep
-                    ? 'bg-[var(--green)] text-white'
-                    : step.id === currentStep
-                    ? 'bg-[var(--green)] text-white ring-4 ring-[var(--green)]/20'
-                    : 'bg-[var(--background-subtle)] text-[var(--text-muted)]'
-                }`}
-              >
-                {step.id < currentStep ? (
-                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                  </svg>
-                ) : (
-                  step.id
-                )}
-              </span>
-              <span className={`mt-2 text-xs font-medium hidden sm:block ${
-                step.id === currentStep ? 'text-[var(--green)]' : 'text-[var(--text-muted)]'
-              }`}>
-                {step.name}
-              </span>
-              <span className={`mt-2 text-xs font-medium sm:hidden ${
-                step.id === currentStep ? 'text-[var(--green)]' : 'text-[var(--text-muted)]'
-              }`}>
-                {step.shortName}
-              </span>
-            </button>
-          </li>
-        ))}
-      </ol>
-    </nav>
-  );
-}
-
-function StickyPlatePreview({ draft }: { draft: ListingDraft }) {
-  if (!draft.combination) {
-    return (
-      <div className="bg-[var(--background-subtle)] rounded-xl p-8 flex items-center justify-center min-h-[200px]">
-        <p className="text-[var(--text-muted)]">Enter a plate combination to see preview</p>
-      </div>
-    );
+function Check({ included, highlight }: { included: boolean; highlight?: boolean }) {
+  if (!included) {
+    return <span className="w-5 h-5 text-[var(--text-muted)]">—</span>;
   }
-
   return (
-    <div className="bg-[var(--background-subtle)] rounded-xl p-8 flex flex-col items-center justify-center">
-      <PlateView
-        combination={draft.combination}
-        state={draft.state || 'VIC'}
-        colorScheme={draft.colorScheme}
-        size="large"
-      />
-      {draft.state && (
-        <p className="mt-4 text-sm text-[var(--text-muted)]">
-          {draft.state} • {draft.plateType ? PLATE_TYPE_NAMES[draft.plateType] : 'Select type'}
+    <svg
+      className={`w-5 h-5 ${highlight ? 'text-[var(--gold)]' : 'text-[var(--green)]'}`}
+      fill="currentColor"
+      viewBox="0 0 20 20"
+    >
+      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+    </svg>
+  );
+}
+
+function Star() {
+  return (
+    <svg className="w-4 h-4 text-[var(--gold)]" fill="currentColor" viewBox="0 0 20 20">
+      <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+    </svg>
+  );
+}
+
+function ChevronDown({ className }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+    </svg>
+  );
+}
+
+// ============================================
+// STEP 1: PLAN SELECTION
+// ============================================
+
+function Step1Plan({
+  boostType,
+  onSelect,
+  onContinue,
+}: {
+  boostType: BoostType | null;
+  onSelect: (type: BoostType) => void;
+  onContinue: () => void;
+}) {
+  return (
+    <div className="max-w-5xl w-full mx-auto">
+      <div className="text-center mb-8">
+        <h1 className="text-3xl font-bold text-[var(--text)] mb-2">
+          Choose Your Listing Plan
+        </h1>
+        <p className="text-[var(--text-secondary)]">
+          Get your plate in front of thousands of buyers
         </p>
-      )}
-    </div>
-  );
-}
-
-// Step 1: Plate Details
-function Step1PlateDetails({
-  draft,
-  onChange,
-}: {
-  draft: ListingDraft;
-  onChange: (updates: Partial<ListingDraft>) => void;
-}) {
-  return (
-    <div className="space-y-6">
-      <div>
-        <label htmlFor="combination" className="block text-sm font-medium text-[var(--text)] mb-2">
-          Plate Combination <span className="text-red-500">*</span>
-        </label>
-        <input
-          type="text"
-          id="combination"
-          value={draft.combination}
-          onChange={(e) => onChange({ combination: e.target.value.toUpperCase().slice(0, 10) })}
-          placeholder="e.g. LEGEND"
-          maxLength={10}
-          className="w-full px-4 py-3 text-2xl font-mono tracking-wider uppercase border border-[var(--border)] rounded-xl focus:outline-none focus:ring-2 focus:ring-[var(--green)] focus:border-transparent"
-        />
-        <p className="mt-1 text-sm text-[var(--text-muted)]">2-10 characters</p>
       </div>
 
-      <div>
-        <label className="block text-sm font-medium text-[var(--text)] mb-2">
-          State <span className="text-red-500">*</span>
-        </label>
-        <div className="grid grid-cols-4 gap-2">
-          {STATES.map((state) => (
-            <button
-              key={state}
-              type="button"
-              onClick={() => onChange({ state })}
-              className={`px-4 py-3 text-sm font-medium rounded-xl border transition-colors ${
-                draft.state === state
-                  ? 'bg-[var(--green)] text-white border-[var(--green)]'
-                  : 'bg-white text-[var(--text)] border-[var(--border)] hover:border-[var(--green)]'
-              }`}
-            >
-              {state}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div>
-        <label className="block text-sm font-medium text-[var(--text)] mb-2">
-          Plate Type <span className="text-red-500">*</span>
-        </label>
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-          {PLATE_TYPES.map((type) => (
-            <button
-              key={type}
-              type="button"
-              onClick={() => onChange({ plateType: type })}
-              className={`px-4 py-3 text-sm font-medium rounded-xl border transition-colors ${
-                draft.plateType === type
-                  ? 'bg-[var(--green)] text-white border-[var(--green)]'
-                  : 'bg-white text-[var(--text)] border-[var(--border)] hover:border-[var(--green)]'
-              }`}
-            >
-              {PLATE_TYPE_NAMES[type]}
-            </button>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// Step 2: Appearance
-function Step2Appearance({
-  draft,
-  onChange,
-}: {
-  draft: ListingDraft;
-  onChange: (updates: Partial<ListingDraft>) => void;
-}) {
-  const [showAllColors, setShowAllColors] = useState(false);
-  const displayedColors = showAllColors ? ALL_COLOR_SCHEMES : COMMON_COLOR_SCHEMES;
-
-  return (
-    <div className="space-y-6">
-      <div>
-        <label className="block text-sm font-medium text-[var(--text)] mb-2">
-          Color Scheme
-        </label>
-        <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
-          {displayedColors.map((scheme) => {
-            const colors = COLOR_SCHEME_COLORS[scheme];
-            return (
-              <button
-                key={scheme}
-                type="button"
-                onClick={() => onChange({ colorScheme: scheme })}
-                className={`relative p-2 rounded-xl border-2 transition-colors ${
-                  draft.colorScheme === scheme
-                    ? 'border-[var(--green)]'
-                    : 'border-transparent hover:border-[var(--border)]'
-                }`}
-                title={COLOR_SCHEME_NAMES[scheme] || scheme}
-              >
-                <div
-                  className="w-full aspect-[2/1] rounded-lg flex items-center justify-center text-xs font-bold"
-                  style={{ backgroundColor: colors?.background, color: colors?.text }}
-                >
-                  AB
-                </div>
-                {draft.colorScheme === scheme && (
-                  <span className="absolute -top-1 -right-1 w-5 h-5 bg-[var(--green)] rounded-full flex items-center justify-center">
-                    <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                    </svg>
-                  </span>
-                )}
-              </button>
-            );
-          })}
-        </div>
+      <div className="grid md:grid-cols-3 gap-6">
+        {/* Standard */}
         <button
-          type="button"
-          onClick={() => setShowAllColors(!showAllColors)}
-          className="mt-2 text-sm text-[var(--green)] hover:underline"
+          onClick={() => onSelect('none')}
+          className={`relative bg-white rounded-2xl text-left transition-all border-2 overflow-hidden ${
+            boostType === 'none'
+              ? 'border-[var(--green)] shadow-xl scale-[1.02]'
+              : 'border-[var(--border)] hover:border-[var(--green)] hover:shadow-lg'
+          }`}
         >
-          {showAllColors ? 'Show fewer colors' : `Show all colors (${ALL_COLOR_SCHEMES.length})`}
+          <div className="p-6 pb-4">
+            <h3 className="text-xl font-bold text-[var(--text)] mb-1">Standard</h3>
+            <p className="text-sm text-[var(--text-muted)] mb-4">Basic listing</p>
+            <div className="flex items-baseline gap-1">
+              <span className="text-4xl font-bold text-[var(--text)]">$9.99</span>
+            </div>
+          </div>
+          <div className="px-6 pb-6 space-y-3">
+            <div className="flex items-center gap-3">
+              <Check included />
+              <span className="text-sm text-[var(--text-secondary)]">Listed until sold</span>
+            </div>
+            <div className="flex items-center gap-3">
+              <Check included />
+              <span className="text-sm text-[var(--text-secondary)]">Up to 5 photos</span>
+            </div>
+            <div className="flex items-center gap-3">
+              <Check included />
+              <span className="text-sm text-[var(--text-secondary)]">Secure messaging</span>
+            </div>
+            <div className="flex items-center gap-3">
+              <Check included={false} />
+              <span className="text-sm text-[var(--text-muted)]">Featured badge</span>
+            </div>
+            <div className="flex items-center gap-3">
+              <Check included={false} />
+              <span className="text-sm text-[var(--text-muted)]">Priority in search</span>
+            </div>
+            <div className="flex items-center gap-3">
+              <Check included={false} />
+              <span className="text-sm text-[var(--text-muted)]">Homepage spotlight</span>
+            </div>
+            <div className="flex items-center gap-3">
+              <Check included={false} />
+              <span className="text-sm text-[var(--text-muted)]">View statistics</span>
+            </div>
+          </div>
+          {boostType === 'none' && (
+            <div className="absolute top-4 right-4 w-6 h-6 bg-[var(--green)] rounded-full flex items-center justify-center">
+              <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+              </svg>
+            </div>
+          )}
+        </button>
+
+        {/* Boost - 7 Day */}
+        <button
+          onClick={() => onSelect('7day')}
+          className={`relative bg-white rounded-2xl text-left transition-all border-2 overflow-hidden ${
+            boostType === '7day'
+              ? 'border-[var(--green)] shadow-xl scale-[1.02]'
+              : 'border-[var(--border)] hover:border-[var(--green)] hover:shadow-lg'
+          }`}
+        >
+          <div className="absolute -top-0 left-0 right-0">
+            <div className="bg-[var(--green)] text-white text-xs font-bold text-center py-1">
+              POPULAR
+            </div>
+          </div>
+          <div className="p-6 pb-4 pt-10">
+            <div className="flex items-center gap-2 mb-1">
+              <Star />
+              <h3 className="text-xl font-bold text-[var(--text)]">Boost</h3>
+            </div>
+            <p className="text-sm text-[var(--text-muted)] mb-4">7 days of visibility</p>
+            <div className="flex items-baseline gap-1">
+              <span className="text-4xl font-bold text-[var(--text)]">$19.98</span>
+            </div>
+          </div>
+          <div className="px-6 pb-6 space-y-3">
+            <div className="flex items-center gap-3">
+              <Check included />
+              <span className="text-sm text-[var(--text-secondary)]">Listed until sold</span>
+            </div>
+            <div className="flex items-center gap-3">
+              <Check included />
+              <span className="text-sm text-[var(--text-secondary)]">Up to 5 photos</span>
+            </div>
+            <div className="flex items-center gap-3">
+              <Check included />
+              <span className="text-sm text-[var(--text-secondary)]">Secure messaging</span>
+            </div>
+            <div className="flex items-center gap-3">
+              <Check included highlight />
+              <span className="text-sm font-medium text-[var(--text)]">Featured badge (7 days)</span>
+            </div>
+            <div className="flex items-center gap-3">
+              <Check included highlight />
+              <span className="text-sm font-medium text-[var(--text)]">Priority in search</span>
+            </div>
+            <div className="flex items-center gap-3">
+              <Check included highlight />
+              <span className="text-sm font-medium text-[var(--text)]">Homepage spotlight</span>
+            </div>
+            <div className="flex items-center gap-3">
+              <Check included highlight />
+              <span className="text-sm font-medium text-[var(--text)]">View statistics</span>
+            </div>
+          </div>
+          {boostType === '7day' && (
+            <div className="absolute top-10 right-4 w-6 h-6 bg-[var(--green)] rounded-full flex items-center justify-center">
+              <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+              </svg>
+            </div>
+          )}
+        </button>
+
+        {/* Boost Pro - 30 Day */}
+        <button
+          onClick={() => onSelect('30day')}
+          className={`relative bg-white rounded-2xl text-left transition-all border-2 overflow-hidden ${
+            boostType === '30day'
+              ? 'border-[var(--gold)] shadow-xl scale-[1.02] ring-4 ring-[var(--gold)]/20'
+              : 'border-[var(--border)] hover:border-[var(--gold)] hover:shadow-lg'
+          }`}
+        >
+          <div className="absolute -top-0 left-0 right-0">
+            <div className="bg-gradient-to-r from-[var(--gold)] to-amber-400 text-black text-xs font-bold text-center py-1">
+              BEST VALUE — UNDER $1/DAY
+            </div>
+          </div>
+          <div className="p-6 pb-4 pt-10">
+            <div className="flex items-center gap-2 mb-1">
+              <Star />
+              <Star />
+              <h3 className="text-xl font-bold text-[var(--text)]">Boost Pro</h3>
+            </div>
+            <p className="text-sm text-[var(--text-muted)] mb-4">30 days maximum exposure</p>
+            <div className="flex items-baseline gap-2">
+              <span className="text-4xl font-bold text-[var(--text)]">$24.99</span>
+              <span className="text-sm text-[var(--text-muted)]">$0.83/day</span>
+            </div>
+          </div>
+          <div className="px-6 pb-6 space-y-3">
+            <div className="flex items-center gap-3">
+              <Check included />
+              <span className="text-sm text-[var(--text-secondary)]">Listed until sold</span>
+            </div>
+            <div className="flex items-center gap-3">
+              <Check included />
+              <span className="text-sm text-[var(--text-secondary)]">Up to 5 photos</span>
+            </div>
+            <div className="flex items-center gap-3">
+              <Check included />
+              <span className="text-sm text-[var(--text-secondary)]">Secure messaging</span>
+            </div>
+            <div className="flex items-center gap-3">
+              <Check included highlight />
+              <span className="text-sm font-medium text-[var(--text)]">Featured badge (30 days)</span>
+            </div>
+            <div className="flex items-center gap-3">
+              <Check included highlight />
+              <span className="text-sm font-medium text-[var(--text)]">Priority in search</span>
+            </div>
+            <div className="flex items-center gap-3">
+              <Check included highlight />
+              <span className="text-sm font-medium text-[var(--text)]">Homepage spotlight</span>
+            </div>
+            <div className="flex items-center gap-3">
+              <Check included highlight />
+              <span className="text-sm font-medium text-[var(--text)]">View statistics</span>
+            </div>
+            <div className="pt-2 border-t border-[var(--border)]">
+              <p className="text-xs text-[var(--gold)] font-semibold mb-2">PRO EXCLUSIVE</p>
+              <div className="flex items-center gap-3">
+                <Check included highlight />
+                <span className="text-sm font-medium text-[var(--text)]">2x Bump to top</span>
+              </div>
+              <div className="flex items-center gap-3 mt-2">
+                <Check included highlight />
+                <span className="text-sm font-medium text-[var(--text)]">Price drop alerts</span>
+              </div>
+            </div>
+          </div>
+          {boostType === '30day' && (
+            <div className="absolute top-10 right-4 w-6 h-6 bg-[var(--gold)] rounded-full flex items-center justify-center">
+              <svg className="w-4 h-4 text-black" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+              </svg>
+            </div>
+          )}
         </button>
       </div>
 
-      <div>
-        <label className="block text-sm font-medium text-[var(--text)] mb-2">
-          Size Format (Front / Rear)
-        </label>
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <p className="text-xs text-[var(--text-muted)] mb-2">Front</p>
-            <select
-              value={draft.sizeFormats[0]}
-              onChange={(e) => onChange({ sizeFormats: [e.target.value as PlateSizeFormat, draft.sizeFormats[1]] })}
-              className="w-full px-4 py-3 border border-[var(--border)] rounded-xl focus:outline-none focus:ring-2 focus:ring-[var(--green)]"
-            >
-              {SIZE_FORMATS.map((format) => (
-                <option key={format} value={format}>{SIZE_FORMAT_NAMES[format]}</option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <p className="text-xs text-[var(--text-muted)] mb-2">Rear</p>
-            <select
-              value={draft.sizeFormats[1]}
-              onChange={(e) => onChange({ sizeFormats: [draft.sizeFormats[0], e.target.value as PlateSizeFormat] })}
-              className="w-full px-4 py-3 border border-[var(--border)] rounded-xl focus:outline-none focus:ring-2 focus:ring-[var(--green)]"
-            >
-              {SIZE_FORMATS.map((format) => (
-                <option key={format} value={format}>{SIZE_FORMAT_NAMES[format]}</option>
-              ))}
-            </select>
-          </div>
-        </div>
+      {/* Continue Button */}
+      <div className="mt-8 flex justify-center">
+        <button
+          onClick={onContinue}
+          disabled={boostType === null}
+          className="px-12 py-4 bg-[var(--green)] text-white text-lg font-semibold rounded-xl hover:bg-[#006B31] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+        >
+          Continue
+        </button>
       </div>
 
-      <div>
-        <label className="block text-sm font-medium text-[var(--text)] mb-2">
-          Material
-        </label>
-        <div className="grid grid-cols-2 gap-2">
-          {MATERIALS.map((mat) => (
-            <button
-              key={mat}
-              type="button"
-              onClick={() => onChange({ material: mat })}
-              className={`px-4 py-3 text-sm font-medium rounded-xl border transition-colors ${
-                draft.material === mat
-                  ? 'bg-[var(--green)] text-white border-[var(--green)]'
-                  : 'bg-white text-[var(--text)] border-[var(--border)] hover:border-[var(--green)]'
-              }`}
-            >
-              {PLATE_MATERIAL_NAMES[mat]}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div>
-        <label className="block text-sm font-medium text-[var(--text)] mb-2">
-          Vehicle Type
-        </label>
-        <div className="grid grid-cols-2 gap-2">
-          {(['car', 'motorcycle'] as VehicleType[]).map((type) => (
-            <button
-              key={type}
-              type="button"
-              onClick={() => onChange({ vehicleType: type })}
-              className={`px-4 py-3 text-sm font-medium rounded-xl border transition-colors ${
-                draft.vehicleType === type
-                  ? 'bg-[var(--green)] text-white border-[var(--green)]'
-                  : 'bg-white text-[var(--text)] border-[var(--border)] hover:border-[var(--green)]'
-              }`}
-            >
-              {type === 'car' ? 'Car' : 'Motorcycle'}
-            </button>
-          ))}
-        </div>
+      {/* Trust badges */}
+      <div className="mt-6 flex items-center justify-center gap-6 text-xs text-[var(--text-muted)]">
+        <span className="flex items-center gap-1">
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+          </svg>
+          Secure payment
+        </span>
+        <span className="flex items-center gap-1">
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          No commission on sale
+        </span>
+        <span className="flex items-center gap-1">
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+          </svg>
+          Instant listing
+        </span>
       </div>
     </div>
   );
 }
 
-// Step 3: Pricing & Details
-function Step3Pricing({
+// ============================================
+// STEP 2: LISTING DETAILS
+// ============================================
+
+function Step2Details({
   draft,
   onChange,
+  errors,
+  onBack,
+  onContinue,
 }: {
   draft: ListingDraft;
   onChange: (updates: Partial<ListingDraft>) => void;
-}) {
-  return (
-    <div className="space-y-6">
-      <div>
-        <label htmlFor="price" className="block text-sm font-medium text-[var(--text)] mb-2">
-          Asking Price (AUD) <span className="text-red-500">*</span>
-        </label>
-        <div className="relative">
-          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text-muted)]">$</span>
-          <input
-            type="number"
-            id="price"
-            value={draft.price || ''}
-            onChange={(e) => onChange({ price: parseInt(e.target.value) || 0 })}
-            placeholder="0"
-            min={100}
-            className="w-full pl-8 pr-4 py-3 text-2xl border border-[var(--border)] rounded-xl focus:outline-none focus:ring-2 focus:ring-[var(--green)] focus:border-transparent"
-          />
-        </div>
-        <p className="mt-1 text-sm text-[var(--text-muted)]">Minimum $100</p>
-      </div>
-
-      <div>
-        <label className="flex items-center gap-3 cursor-pointer">
-          <input
-            type="checkbox"
-            checked={draft.isOpenToOffers}
-            onChange={(e) => onChange({ isOpenToOffers: e.target.checked })}
-            className="w-5 h-5 rounded border-[var(--border)] text-[var(--green)] focus:ring-[var(--green)]"
-          />
-          <span className="text-sm font-medium text-[var(--text)]">Open to offers</span>
-        </label>
-        <p className="mt-1 ml-8 text-sm text-[var(--text-muted)]">
-          Let buyers know you&apos;re willing to negotiate
-        </p>
-      </div>
-
-      <div>
-        <label htmlFor="description" className="block text-sm font-medium text-[var(--text)] mb-2">
-          Description
-        </label>
-        <textarea
-          id="description"
-          value={draft.description}
-          onChange={(e) => onChange({ description: e.target.value.slice(0, 1000) })}
-          placeholder="Tell buyers about your plate..."
-          rows={4}
-          maxLength={1000}
-          className="w-full px-4 py-3 border border-[var(--border)] rounded-xl focus:outline-none focus:ring-2 focus:ring-[var(--green)] focus:border-transparent resize-none"
-        />
-        <p className="mt-1 text-sm text-[var(--text-muted)]">
-          {draft.description.length}/1000 characters
-        </p>
-      </div>
-    </div>
-  );
-}
-
-// Step 4: Photos
-function Step4Photos({
-  draft,
-  onChange,
-}: {
-  draft: ListingDraft;
-  onChange: (updates: Partial<ListingDraft>) => void;
+  errors: FormErrors;
+  onBack: () => void;
+  onContinue: () => void;
 }) {
   const { getAccessToken } = useAuth();
+  const [showAllColors, setShowAllColors] = useState(false);
+  const [showAllPlateTypes, setShowAllPlateTypes] = useState(false);
+  const [moreDetailsOpen, setMoreDetailsOpen] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
+  const displayedColors = showAllColors ? ALL_COLORS : COMMON_COLORS;
+  const displayedPlateTypes = showAllPlateTypes ? ALL_PLATE_TYPES : COMMON_PLATE_TYPES;
+
+  // Photo upload handlers
+  const handleFileSelect = useCallback(async (files: FileList | null) => {
     if (!files || files.length === 0) return;
 
     setIsUploading(true);
@@ -529,13 +482,11 @@ function Step4Photos({
       const token = await getAccessToken();
       if (!token) throw new Error('Not authenticated');
 
-      const { uploadPhoto } = await import('@/lib/api');
       const newPhotos: string[] = [];
+      const remaining = MAX_PHOTOS - draft.photos.length;
 
-      for (const file of Array.from(files)) {
-        if (draft.photos.length + newPhotos.length >= 5) break;
-
-        // Upload to Supabase Storage
+      for (const file of Array.from(files).slice(0, remaining)) {
+        if (!file.type.startsWith('image/')) continue;
         const result = await uploadPhoto(token, file);
         newPhotos.push(result.url);
       }
@@ -547,76 +498,456 @@ function Step4Photos({
     } finally {
       setIsUploading(false);
     }
-  };
+  }, [draft.photos, getAccessToken, onChange]);
 
-  const removePhoto = (index: number) => {
-    const newPhotos = [...draft.photos];
-    newPhotos.splice(index, 1);
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    handleFileSelect(e.dataTransfer.files);
+  }, [handleFileSelect]);
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+  }, []);
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+  }, []);
+
+  const removePhoto = useCallback(async (index: number) => {
+    const url = draft.photos[index];
+    const newPhotos = draft.photos.filter((_, i) => i !== index);
     onChange({ photos: newPhotos });
-  };
+
+    // Try to delete from storage (fire and forget)
+    try {
+      const token = await getAccessToken();
+      if (token && url) {
+        await deletePhoto(token, url);
+      }
+    } catch {
+      // Ignore deletion errors
+    }
+  }, [draft.photos, onChange, getAccessToken]);
+
+  const borderClass = draft.boostType === '30day'
+    ? 'border-[var(--gold)] shadow-lg shadow-amber-100'
+    : draft.boostType === '7day'
+    ? 'border-[var(--green)] shadow-lg shadow-green-100'
+    : 'border-[var(--border)]';
 
   return (
-    <div className="space-y-6">
-      <div>
-        <label className="block text-sm font-medium text-[var(--text)] mb-2">
-          Photos (optional, max 5)
-        </label>
-
-        {/* Photo grid */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-4">
-          {draft.photos.map((url, index) => (
-            <div key={index} className="relative aspect-square rounded-xl overflow-hidden bg-[var(--background-subtle)]">
-              <img src={url} alt={`Photo ${index + 1}`} className="w-full h-full object-cover" />
-              <button
-                type="button"
-                onClick={() => removePhoto(index)}
-                className="absolute top-2 right-2 w-8 h-8 bg-black/50 text-white rounded-full flex items-center justify-center hover:bg-black/70"
-                aria-label={`Remove photo ${index + 1}`}
-              >
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
+    <div className="max-w-2xl w-full mx-auto">
+      <div className={`bg-white rounded-2xl p-6 border-2 ${borderClass}`}>
+        {/* Tier badge */}
+        {draft.boostType !== 'none' && (
+          <div className="flex justify-end mb-4">
+            <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold ${
+              draft.boostType === '30day'
+                ? 'bg-gradient-to-r from-[var(--gold)] to-amber-400 text-black'
+                : 'bg-[var(--green)] text-white'
+            }`}>
+              <Star />
+              {TIER_INFO[draft.boostType].name}
             </div>
-          ))}
+          </div>
+        )}
 
-          {draft.photos.length < 5 && (
-            <label className="aspect-square rounded-xl border-2 border-dashed border-[var(--border)] flex flex-col items-center justify-center cursor-pointer hover:border-[var(--green)] transition-colors">
-              <input
-                type="file"
-                accept="image/*"
-                multiple
-                onChange={handleFileSelect}
-                className="sr-only"
-                disabled={isUploading}
-              />
-              {isUploading ? (
-                <div className="w-8 h-8 border-2 border-[var(--green)] border-t-transparent rounded-full animate-spin" />
-              ) : (
-                <>
-                  <svg className="w-8 h-8 text-[var(--text-muted)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                  </svg>
-                  <span className="mt-2 text-sm text-[var(--text-muted)]">Add photo</span>
-                </>
-              )}
-            </label>
+        {/* Combination with inline preview */}
+        <div className="mb-6">
+          <label className="block text-sm font-medium text-[var(--text)] mb-2">
+            Plate Combination <span className="text-[var(--error)]">*</span>
+          </label>
+          <div className="flex gap-4 items-center">
+            <input
+              type="text"
+              value={draft.combination}
+              onChange={(e) => onChange({ combination: e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 10) })}
+              placeholder="e.g. LEGEND"
+              maxLength={10}
+              className={`flex-1 px-4 py-3 text-xl font-mono tracking-wider uppercase border rounded-xl focus:outline-none focus:ring-2 focus:ring-[var(--green)] focus:border-transparent ${
+                errors.combination ? 'border-[var(--error)]' : 'border-[var(--border)]'
+              }`}
+              autoFocus
+            />
+            {draft.combination && (
+              <div className="flex-shrink-0">
+                <PlateView
+                  combination={draft.combination}
+                  state={draft.state || 'VIC'}
+                  colorScheme={draft.colorScheme}
+                  size="small"
+                />
+              </div>
+            )}
+          </div>
+          {errors.combination ? (
+            <p className="mt-1 text-sm text-[var(--error)]">{errors.combination}</p>
+          ) : (
+            <p className="mt-1 text-sm text-[var(--text-muted)]">2-10 letters and numbers</p>
           )}
         </div>
 
-        {uploadError && (
-          <p className="text-sm text-red-500">{uploadError}</p>
-        )}
+        {/* State & Type Row */}
+        <div className="grid grid-cols-2 gap-4 mb-6">
+          <div>
+            <label className="block text-sm font-medium text-[var(--text)] mb-2">
+              State <span className="text-[var(--error)]">*</span>
+            </label>
+            <select
+              value={draft.state || ''}
+              onChange={(e) => onChange({ state: e.target.value as AustralianState })}
+              className={`w-full px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 focus:ring-[var(--green)] ${
+                errors.state ? 'border-[var(--error)]' : 'border-[var(--border)]'
+              }`}
+            >
+              <option value="">Select state</option>
+              {STATES.map((s) => (
+                <option key={s} value={s}>{s}</option>
+              ))}
+            </select>
+            {errors.state && (
+              <p className="mt-1 text-sm text-[var(--error)]">{errors.state}</p>
+            )}
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-[var(--text)] mb-2">
+              Plate Type <span className="text-[var(--error)]">*</span>
+            </label>
+            <select
+              value={draft.plateType || ''}
+              onChange={(e) => onChange({ plateType: e.target.value as PlateType })}
+              className={`w-full px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 focus:ring-[var(--green)] ${
+                errors.plateType ? 'border-[var(--error)]' : 'border-[var(--border)]'
+              }`}
+            >
+              <option value="">Select type</option>
+              {displayedPlateTypes.map((type) => (
+                <option key={type} value={type}>{PLATE_TYPE_NAMES[type]}</option>
+              ))}
+            </select>
+            {!showAllPlateTypes && (
+              <button
+                type="button"
+                onClick={() => setShowAllPlateTypes(true)}
+                className="mt-1 text-xs text-[var(--green)] hover:underline"
+              >
+                Show all types
+              </button>
+            )}
+            {errors.plateType && (
+              <p className="mt-1 text-sm text-[var(--error)]">{errors.plateType}</p>
+            )}
+          </div>
+        </div>
 
-        <p className="text-sm text-[var(--text-muted)]">
-          Photos help buyers see the actual condition. JPG or PNG, max 5MB each.
-        </p>
+        {/* Color Scheme */}
+        <div className="mb-6">
+          <label className="block text-sm font-medium text-[var(--text)] mb-2">
+            Color Scheme
+          </label>
+          <div className="flex flex-wrap gap-2">
+            {displayedColors.map((scheme) => {
+              const colors = COLOR_SCHEME_COLORS[scheme];
+              return (
+                <button
+                  key={scheme}
+                  type="button"
+                  onClick={() => onChange({ colorScheme: scheme })}
+                  className={`p-2 rounded-xl border-2 transition-all ${
+                    draft.colorScheme === scheme
+                      ? 'border-[var(--green)] scale-105'
+                      : 'border-[var(--border)] hover:border-[var(--green)]'
+                  }`}
+                >
+                  <div
+                    className="w-12 h-6 rounded flex items-center justify-center text-xs font-bold"
+                    style={{ backgroundColor: colors?.background, color: colors?.text }}
+                  >
+                    AB
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+          <button
+            type="button"
+            onClick={() => setShowAllColors(!showAllColors)}
+            className="mt-2 text-sm text-[var(--green)] hover:underline"
+          >
+            {showAllColors ? 'Show fewer colors' : 'Show more colors'}
+          </button>
+        </div>
+
+        {/* Photo Upload */}
+        <div className="mb-6">
+          <label className="block text-sm font-medium text-[var(--text)] mb-2">
+            Photos <span className="text-[var(--text-muted)] font-normal">({draft.photos.length}/{MAX_PHOTOS})</span>
+          </label>
+
+          {draft.photos.length > 0 && (
+            <div className="grid grid-cols-5 gap-2 mb-3">
+              {draft.photos.map((url, index) => (
+                <div key={index} className="relative aspect-square rounded-lg overflow-hidden group">
+                  <Image
+                    src={url}
+                    alt={`Photo ${index + 1}`}
+                    fill
+                    className="object-cover"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => removePhoto(index)}
+                    className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
+                  >
+                    <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                  </button>
+                  {index === 0 && (
+                    <div className="absolute bottom-1 left-1 bg-black/70 text-white text-[10px] px-1.5 py-0.5 rounded">
+                      Cover
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {draft.photos.length < MAX_PHOTOS && (
+            <div
+              onDrop={handleDrop}
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onClick={() => fileInputRef.current?.click()}
+              className={`border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-all ${
+                isDragging
+                  ? 'border-[var(--green)] bg-green-50'
+                  : 'border-[var(--border)] hover:border-[var(--green)] hover:bg-[var(--background-subtle)]'
+              }`}
+            >
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                multiple
+                onChange={(e) => handleFileSelect(e.target.files)}
+                className="hidden"
+                disabled={isUploading}
+              />
+              {isUploading ? (
+                <div className="w-8 h-8 mx-auto border-2 border-[var(--green)] border-t-transparent rounded-full animate-spin" />
+              ) : (
+                <>
+                  <svg className="w-8 h-8 mx-auto text-[var(--text-muted)] mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                  <p className="text-sm text-[var(--text-secondary)]">
+                    {isDragging ? 'Drop photos here' : 'Drag photos here or click to browse'}
+                  </p>
+                  <p className="text-xs text-[var(--text-muted)] mt-1">
+                    {MAX_PHOTOS - draft.photos.length} photo{MAX_PHOTOS - draft.photos.length !== 1 ? 's' : ''} remaining
+                  </p>
+                </>
+              )}
+            </div>
+          )}
+
+          {uploadError && (
+            <p className="mt-2 text-sm text-[var(--error)]">{uploadError}</p>
+          )}
+          {errors.photos && (
+            <p className="mt-2 text-sm text-[var(--error)]">{errors.photos}</p>
+          )}
+        </div>
+
+        {/* Divider */}
+        <div className="border-t border-[var(--border)] my-6" />
+
+        {/* Price */}
+        <div className="mb-6">
+          <label className="block text-sm font-medium text-[var(--text)] mb-2">
+            Asking Price <span className="text-[var(--error)]">*</span>
+          </label>
+          <div className="flex items-center gap-4">
+            <div className="relative flex-1">
+              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xl text-[var(--text-muted)]">$</span>
+              <input
+                type="number"
+                value={draft.price || ''}
+                onChange={(e) => onChange({ price: parseInt(e.target.value) || 0 })}
+                placeholder="0"
+                min={100}
+                max={10000000}
+                className={`w-full pl-10 pr-4 py-3 text-xl font-semibold border rounded-xl focus:outline-none focus:ring-2 focus:ring-[var(--green)] focus:border-transparent ${
+                  errors.price ? 'border-[var(--error)]' : 'border-[var(--border)]'
+                }`}
+              />
+            </div>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={draft.isOpenToOffers}
+                onChange={(e) => onChange({ isOpenToOffers: e.target.checked })}
+                className="w-5 h-5 rounded border-[var(--border)] text-[var(--green)] focus:ring-[var(--green)]"
+              />
+              <span className="text-sm text-[var(--text-secondary)]">Open to offers</span>
+            </label>
+          </div>
+          {errors.price ? (
+            <p className="mt-1 text-sm text-[var(--error)]">{errors.price}</p>
+          ) : (
+            <p className="mt-1 text-xs text-[var(--text-muted)]">Minimum $100</p>
+          )}
+        </div>
+
+        {/* Description */}
+        <div className="mb-6">
+          <label className="block text-sm font-medium text-[var(--text)] mb-2">
+            Description <span className="text-[var(--text-muted)] font-normal">(optional)</span>
+          </label>
+          <textarea
+            value={draft.description}
+            onChange={(e) => onChange({ description: e.target.value.slice(0, 1000) })}
+            placeholder="Tell buyers about your plate..."
+            rows={3}
+            maxLength={1000}
+            className={`w-full px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 focus:ring-[var(--green)] focus:border-transparent resize-none ${
+              errors.description ? 'border-[var(--error)]' : 'border-[var(--border)]'
+            }`}
+          />
+          <p className="mt-1 text-xs text-[var(--text-muted)]">
+            {draft.description.length}/1000 characters
+          </p>
+          {errors.description && (
+            <p className="mt-1 text-sm text-[var(--error)]">{errors.description}</p>
+          )}
+        </div>
+
+        {/* More details (collapsible) */}
+        <div className="mb-6">
+          <button
+            type="button"
+            onClick={() => setMoreDetailsOpen(!moreDetailsOpen)}
+            className="flex items-center gap-2 text-sm font-medium text-[var(--text)] hover:text-[var(--green)] transition-colors"
+          >
+            <ChevronDown className={`w-4 h-4 transition-transform ${moreDetailsOpen ? 'rotate-180' : ''}`} />
+            More details <span className="text-[var(--text-muted)] font-normal">(optional)</span>
+          </button>
+
+          {moreDetailsOpen && (
+            <div className="mt-4 space-y-4 pl-6 border-l-2 border-[var(--border)]">
+              {/* Size Format */}
+              <div>
+                <label className="block text-sm font-medium text-[var(--text)] mb-2">
+                  Size Format (Front / Rear)
+                </label>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-xs text-[var(--text-muted)] mb-1">Front</p>
+                    <select
+                      value={draft.sizeFormats[0]}
+                      onChange={(e) => onChange({ sizeFormats: [e.target.value as PlateSizeFormat, draft.sizeFormats[1]] })}
+                      className="w-full px-3 py-2 border border-[var(--border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--green)]"
+                    >
+                      {SIZE_FORMATS.map((format) => (
+                        <option key={format} value={format}>{SIZE_FORMAT_NAMES[format]}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <p className="text-xs text-[var(--text-muted)] mb-1">Rear</p>
+                    <select
+                      value={draft.sizeFormats[1]}
+                      onChange={(e) => onChange({ sizeFormats: [draft.sizeFormats[0], e.target.value as PlateSizeFormat] })}
+                      className="w-full px-3 py-2 border border-[var(--border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--green)]"
+                    >
+                      {SIZE_FORMATS.map((format) => (
+                        <option key={format} value={format}>{SIZE_FORMAT_NAMES[format]}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              {/* Material */}
+              <div>
+                <label className="block text-sm font-medium text-[var(--text)] mb-2">
+                  Material
+                </label>
+                <select
+                  value={draft.material}
+                  onChange={(e) => onChange({ material: e.target.value as PlateMaterial })}
+                  className="w-full px-3 py-2 border border-[var(--border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--green)]"
+                >
+                  {MATERIALS.map((mat) => (
+                    <option key={mat} value={mat}>{PLATE_MATERIAL_NAMES[mat]}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Vehicle Type */}
+              <div>
+                <label className="block text-sm font-medium text-[var(--text)] mb-2">
+                  Vehicle Type
+                </label>
+                <select
+                  value={draft.vehicleType}
+                  onChange={(e) => onChange({ vehicleType: e.target.value as VehicleType })}
+                  className="w-full px-3 py-2 border border-[var(--border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--green)]"
+                >
+                  <option value="car">Car</option>
+                  <option value="motorcycle">Motorcycle</option>
+                </select>
+              </div>
+
+              {/* Contact Preference */}
+              <div>
+                <label className="block text-sm font-medium text-[var(--text)] mb-2">
+                  Contact Preference
+                </label>
+                <select
+                  value={draft.contactPreference}
+                  onChange={(e) => onChange({ contactPreference: e.target.value as ContactPreference })}
+                  className="w-full px-3 py-2 border border-[var(--border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--green)]"
+                >
+                  <option value="messaging">In-app messaging</option>
+                  <option value="phone">Phone</option>
+                  <option value="email">Email</option>
+                </select>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Navigation */}
+        <div className="flex gap-4 mt-6 pt-6 border-t border-[var(--border)]">
+          <button
+            type="button"
+            onClick={onBack}
+            className="flex-1 py-3 border border-[var(--border)] text-[var(--text)] font-medium rounded-xl hover:bg-[var(--background-subtle)] transition-colors"
+          >
+            Back
+          </button>
+          <button
+            type="button"
+            onClick={onContinue}
+            className="flex-1 py-3 bg-[var(--green)] text-white font-medium rounded-xl hover:bg-[#006B31] transition-colors"
+          >
+            Review & Pay
+          </button>
+        </div>
       </div>
     </div>
   );
 }
 
-// Payment Form Component (uses Stripe Elements)
+// ============================================
+// PAYMENT FORM (STRIPE ELEMENTS)
+// ============================================
+
 function PaymentForm({
   amount,
   onSuccess,
@@ -636,9 +967,7 @@ function PaymentForm({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!stripe || !elements) {
-      return;
-    }
+    if (!stripe || !elements) return;
 
     setIsProcessing(true);
 
@@ -658,7 +987,6 @@ function PaymentForm({
       }
 
       if (paymentIntent && paymentIntent.status === 'succeeded') {
-        // Confirm with our backend to publish the listing
         const token = await getAccessToken();
         if (token) {
           await confirmPayment(token, paymentIntentId);
@@ -704,10 +1032,14 @@ function PaymentForm({
   );
 }
 
-// Step 5: Review & Pay
-function Step5Review({
+// ============================================
+// STEP 3: REVIEW & PAY
+// ============================================
+
+function Step3Pay({
   draft,
   onChange,
+  onBack,
   isCreatingListing,
   onCreateListing,
   error,
@@ -719,6 +1051,7 @@ function Step5Review({
 }: {
   draft: ListingDraft;
   onChange: (updates: Partial<ListingDraft>) => void;
+  onBack: () => void;
   isCreatingListing: boolean;
   onCreateListing: () => void;
   error: string | null;
@@ -728,209 +1061,187 @@ function Step5Review({
   onPaymentSuccess: () => void;
   onPaymentError: (error: string) => void;
 }) {
-  const listingFee = 999; // $9.99 in cents
-  const boost7DayTotal = 1998; // $19.98 (listing + 7-day boost)
-  const boost30DayTotal = 2499; // $24.99 (listing + 30-day boost - best value)
+  const borderClass = draft.boostType === '30day'
+    ? 'border-[var(--gold)] shadow-lg shadow-amber-100'
+    : draft.boostType === '7day'
+    ? 'border-[var(--green)] shadow-lg shadow-green-100'
+    : 'border-[var(--border)]';
 
-  const getTotal = () => {
-    if (draft.boostType === '7day') return boost7DayTotal;
-    if (draft.boostType === '30day') return boost30DayTotal;
-    return listingFee;
-  };
+  const total = TIER_PRICES[draft.boostType];
 
-  // If we have clientSecret, show the payment form
+  // If we have clientSecret, show Stripe payment form
   if (clientSecret && paymentIntentId) {
     return (
-      <div className="space-y-6">
-        {/* Summary (compact) */}
-        <div className="bg-[var(--background-subtle)] rounded-xl p-4">
-          <div className="flex justify-between items-center">
-            <div>
-              <p className="font-semibold text-[var(--text)]">{draft.combination}</p>
-              <p className="text-sm text-[var(--text-muted)]">{draft.state} • {draft.plateType && PLATE_TYPE_NAMES[draft.plateType]}</p>
-            </div>
-            <p className="text-xl font-bold text-[var(--text)]">${(paymentAmount / 100).toFixed(2)}</p>
+      <div className="max-w-lg w-full mx-auto">
+        <div className={`bg-white rounded-2xl overflow-hidden border-2 ${borderClass}`}>
+          {/* Plate Preview */}
+          <div className="bg-gradient-to-br from-slate-900 to-slate-800 p-6 flex flex-col items-center relative">
+            {draft.boostType !== 'none' && (
+              <div className={`absolute top-3 right-3 inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold ${
+                draft.boostType === '30day'
+                  ? 'bg-gradient-to-r from-[var(--gold)] to-amber-400 text-black'
+                  : 'bg-[var(--green)] text-white'
+              }`}>
+                <Star />
+                {TIER_INFO[draft.boostType].name}
+              </div>
+            )}
+            <PlateView
+              combination={draft.combination}
+              state={draft.state || 'VIC'}
+              colorScheme={draft.colorScheme}
+              size="medium"
+            />
+            <p className="mt-3 text-white/60 text-sm">
+              {draft.state} • {draft.plateType && PLATE_TYPE_NAMES[draft.plateType]}
+            </p>
+          </div>
+
+          <div className="p-6">
+            {error && (
+              <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-xl">
+                <p className="text-sm text-[var(--error)]">{error}</p>
+              </div>
+            )}
+
+            <Elements
+              stripe={stripePromise}
+              options={{
+                clientSecret,
+                appearance: {
+                  theme: 'stripe',
+                  variables: {
+                    colorPrimary: '#00843D',
+                    borderRadius: '12px',
+                  },
+                },
+              }}
+            >
+              <PaymentForm
+                amount={paymentAmount}
+                onSuccess={onPaymentSuccess}
+                onError={onPaymentError}
+                paymentIntentId={paymentIntentId}
+              />
+            </Elements>
           </div>
         </div>
-
-        {/* Error Message */}
-        {error && (
-          <div className="p-4 bg-red-50 border border-red-200 rounded-xl">
-            <p className="text-sm text-red-600">{error}</p>
-          </div>
-        )}
-
-        {/* Stripe Elements Payment Form */}
-        <Elements
-          stripe={stripePromise}
-          options={{
-            clientSecret,
-            appearance: {
-              theme: 'stripe',
-              variables: {
-                colorPrimary: '#00843D',
-                borderRadius: '12px',
-              },
-            },
-          }}
-        >
-          <PaymentForm
-            amount={paymentAmount}
-            onSuccess={onPaymentSuccess}
-            onError={onPaymentError}
-            paymentIntentId={paymentIntentId}
-          />
-        </Elements>
       </div>
     );
   }
 
+  // Initial review & pay screen
   return (
-    <div className="space-y-6">
-      {/* Summary */}
-      <div className="bg-[var(--background-subtle)] rounded-xl p-6">
-        <h3 className="font-semibold text-[var(--text)] mb-4">Listing Summary</h3>
-        <dl className="space-y-2 text-sm">
-          <div className="flex justify-between">
-            <dt className="text-[var(--text-secondary)]">Plate</dt>
-            <dd className="font-medium text-[var(--text)]">{draft.combination}</dd>
-          </div>
-          <div className="flex justify-between">
-            <dt className="text-[var(--text-secondary)]">State</dt>
-            <dd className="font-medium text-[var(--text)]">{draft.state}</dd>
-          </div>
-          <div className="flex justify-between">
-            <dt className="text-[var(--text-secondary)]">Type</dt>
-            <dd className="font-medium text-[var(--text)]">{draft.plateType && PLATE_TYPE_NAMES[draft.plateType]}</dd>
-          </div>
-          <div className="flex justify-between">
-            <dt className="text-[var(--text-secondary)]">Price</dt>
-            <dd className="font-medium text-[var(--text)]">${draft.price.toLocaleString()}</dd>
-          </div>
-          {draft.isOpenToOffers && (
-            <div className="flex justify-between">
-              <dt className="text-[var(--text-secondary)]">Offers</dt>
-              <dd className="font-medium text-[var(--green)]">Open to offers</dd>
+    <div className="max-w-lg w-full mx-auto">
+      <div className={`bg-white rounded-2xl overflow-hidden border-2 ${borderClass}`}>
+        {/* Plate Preview */}
+        <div className="bg-gradient-to-br from-slate-900 to-slate-800 p-6 flex flex-col items-center relative">
+          {draft.boostType !== 'none' && (
+            <div className={`absolute top-3 right-3 inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold ${
+              draft.boostType === '30day'
+                ? 'bg-gradient-to-r from-[var(--gold)] to-amber-400 text-black'
+                : 'bg-[var(--green)] text-white'
+            }`}>
+              <Star />
+              {TIER_INFO[draft.boostType].name}
             </div>
           )}
-        </dl>
-      </div>
+          <PlateView
+            combination={draft.combination}
+            state={draft.state || 'VIC'}
+            colorScheme={draft.colorScheme}
+            size="medium"
+          />
+          <p className="mt-3 text-white/60 text-sm">
+            {draft.state} • {draft.plateType && PLATE_TYPE_NAMES[draft.plateType]}
+          </p>
+        </div>
 
-      {/* Promo Code */}
-      <div>
-        <label htmlFor="promo" className="block text-sm font-medium text-[var(--text)] mb-2">
-          Promo Code (optional)
-        </label>
-        <input
-          type="text"
-          id="promo"
-          value={draft.promoCode}
-          onChange={(e) => onChange({ promoCode: e.target.value.toUpperCase() })}
-          placeholder="Enter code"
-          className="w-full px-4 py-3 border border-[var(--border)] rounded-xl focus:outline-none focus:ring-2 focus:ring-[var(--green)] focus:border-transparent uppercase"
-        />
-      </div>
+        {/* Details */}
+        <div className="p-6 space-y-4">
+          <div className="flex justify-between">
+            <span className="text-[var(--text-secondary)]">Your Asking Price</span>
+            <span className="font-semibold text-[var(--text)]">${draft.price.toLocaleString()}</span>
+          </div>
 
-      {/* Boost Options */}
-      <div>
-        <label className="block text-sm font-medium text-[var(--text)] mb-3">
-          Boost Your Listing
-        </label>
-        <div className="space-y-3">
-          <label className={`flex items-start gap-4 p-4 rounded-xl border-2 cursor-pointer transition-colors ${
-            draft.boostType === 'none' ? 'border-[var(--green)] bg-[var(--green)]/5' : 'border-[var(--border)]'
-          }`}>
-            <input
-              type="radio"
-              name="boost"
-              checked={draft.boostType === 'none'}
-              onChange={() => onChange({ boostType: 'none' })}
-              className="mt-1"
-            />
-            <div className="flex-1">
-              <p className="font-medium text-[var(--text)]">Standard Listing</p>
-              <p className="text-sm text-[var(--text-muted)]">Basic listing on AusPlates</p>
+          {draft.isOpenToOffers && (
+            <div className="flex justify-between">
+              <span className="text-[var(--text-secondary)]">Offers</span>
+              <span className="font-medium text-[var(--green)]">Open to offers</span>
             </div>
-            <span className="font-medium text-[var(--text)]">$9.99</span>
-          </label>
+          )}
 
-          <label className={`flex items-start gap-4 p-4 rounded-xl border-2 cursor-pointer transition-colors ${
-            draft.boostType === '7day' ? 'border-[var(--green)] bg-[var(--green)]/5' : 'border-[var(--border)]'
-          }`}>
+          {/* Promo Code */}
+          <div className="pt-4 border-t border-[var(--border)]">
+            <label className="block text-sm font-medium text-[var(--text)] mb-2">
+              Promo Code
+            </label>
             <input
-              type="radio"
-              name="boost"
-              checked={draft.boostType === '7day'}
-              onChange={() => onChange({ boostType: '7day' })}
-              className="mt-1"
+              type="text"
+              value={draft.promoCode}
+              onChange={(e) => onChange({ promoCode: e.target.value.toUpperCase() })}
+              placeholder="Enter code"
+              className="w-full px-4 py-3 border border-[var(--border)] rounded-xl focus:outline-none focus:ring-2 focus:ring-[var(--green)] focus:border-transparent uppercase"
             />
-            <div className="flex-1">
-              <p className="font-medium text-[var(--text)]">7-Day Boost</p>
-              <p className="text-sm text-[var(--text-muted)]">Featured for 7 days, 3x more views</p>
-            </div>
-            <span className="font-medium text-[var(--text)]">$19.98</span>
-          </label>
+          </div>
 
-          <label className={`flex items-start gap-4 p-4 rounded-xl border-2 cursor-pointer transition-colors relative ${
-            draft.boostType === '30day' ? 'border-[var(--green)] bg-[var(--green)]/5' : 'border-[var(--border)]'
-          }`}>
-            <span className="absolute -top-2 right-4 px-2 py-0.5 bg-[var(--gold)] text-xs font-semibold rounded">BEST VALUE</span>
-            <input
-              type="radio"
-              name="boost"
-              checked={draft.boostType === '30day'}
-              onChange={() => onChange({ boostType: '30day' })}
-              className="mt-1"
-            />
-            <div className="flex-1">
-              <p className="font-medium text-[var(--text)]">30-Day Boost</p>
-              <p className="text-sm text-[var(--text-muted)]">30 days featured, priority placement</p>
+          {/* Total */}
+          <div className="pt-4 mt-4 border-t border-[var(--border)]">
+            <div className="flex justify-between items-center">
+              <div>
+                <span className="text-[var(--text)] font-medium">Listing Fee</span>
+                {draft.boostType !== 'none' && (
+                  <p className="text-xs text-[var(--text-muted)]">
+                    {draft.boostType === '30day' ? '30 days featured' : '7 days featured'}
+                  </p>
+                )}
+              </div>
+              <span className="text-2xl font-bold text-[var(--text)]">${(total / 100).toFixed(2)}</span>
             </div>
-            <span className="font-medium text-[var(--text)]">$24.99</span>
-          </label>
+          </div>
+
+          {error && (
+            <div className="p-4 bg-red-50 border border-red-200 rounded-xl">
+              <p className="text-sm text-[var(--error)]">{error}</p>
+            </div>
+          )}
+
+          {/* Navigation */}
+          <div className="flex gap-3 mt-6 pt-4 border-t border-[var(--border)]">
+            <button
+              type="button"
+              onClick={onBack}
+              className="flex-1 py-3 border border-[var(--border)] text-[var(--text)] font-medium rounded-xl hover:bg-[var(--background-subtle)] transition-colors"
+            >
+              Back
+            </button>
+            <button
+              type="button"
+              onClick={onCreateListing}
+              disabled={isCreatingListing}
+              className="flex-1 py-3 bg-[var(--green)] text-white font-semibold rounded-xl hover:bg-[#006B31] transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+            >
+              {isCreatingListing ? (
+                <>
+                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  Preparing...
+                </>
+              ) : (
+                <>
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                  </svg>
+                  Pay ${(total / 100).toFixed(2)}
+                </>
+              )}
+            </button>
+          </div>
+
+          <p className="text-xs text-center text-[var(--text-muted)]">
+            Secure payment powered by Stripe
+          </p>
         </div>
       </div>
-
-      {/* Total */}
-      <div className="bg-[var(--text)] text-white rounded-xl p-6">
-        <div className="flex justify-between items-center">
-          <span className="text-lg">Total</span>
-          <span className="text-2xl font-bold">${(getTotal() / 100).toFixed(2)}</span>
-        </div>
-      </div>
-
-      {/* Error Message */}
-      {error && (
-        <div className="p-4 bg-red-50 border border-red-200 rounded-xl">
-          <p className="text-sm text-red-600">{error}</p>
-        </div>
-      )}
-
-      {/* Continue to Payment Button */}
-      <button
-        type="button"
-        onClick={onCreateListing}
-        disabled={isCreatingListing}
-        className="w-full py-4 bg-[var(--green)] text-white text-lg font-semibold rounded-xl hover:bg-[#006B31] disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
-      >
-        {isCreatingListing ? (
-          <>
-            <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-            Preparing Payment...
-          </>
-        ) : (
-          <>
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-            </svg>
-            Continue to Payment
-          </>
-        )}
-      </button>
-
-      <p className="text-xs text-center text-[var(--text-muted)]">
-        By listing, you agree to our Terms of Service and confirm this plate is legally transferable.
-      </p>
     </div>
   );
 }
@@ -941,27 +1252,31 @@ function Step5Review({
 
 function CreateListingContent() {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const { isAuthenticated, isLoading: authLoading, getAccessToken } = useAuth();
 
-  const [currentStep, setCurrentStep] = useState(1);
   const [draft, setDraft] = useState<ListingDraft>(INITIAL_DRAFT);
+  const [errors, setErrors] = useState<FormErrors>({});
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [isCreatingListing, setIsCreatingListing] = useState(false);
 
-  // Payment state for embedded Stripe Elements
+  // Payment state
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [paymentIntentId, setPaymentIntentId] = useState<string | null>(null);
   const [paymentAmount, setPaymentAmount] = useState(0);
-  const [createdListingSlug, setCreatedListingSlug] = useState<string | null>(null);
 
   // Load draft from localStorage
   useEffect(() => {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved) {
       try {
-        const parsed = JSON.parse(saved);
-        setDraft({ ...INITIAL_DRAFT, ...parsed });
+        const parsed = JSON.parse(saved) as ListingDraft;
+        // Check if draft is expired (7 days)
+        const expiryMs = DRAFT_EXPIRY_DAYS * 24 * 60 * 60 * 1000;
+        if (Date.now() - parsed.savedAt < expiryMs) {
+          setDraft({ ...INITIAL_DRAFT, ...parsed });
+        } else {
+          localStorage.removeItem(STORAGE_KEY);
+        }
       } catch {
         // Ignore parse errors
       }
@@ -970,7 +1285,8 @@ function CreateListingContent() {
 
   // Save draft to localStorage on changes
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(draft));
+    const toSave = { ...draft, savedAt: Date.now() };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(toSave));
   }, [draft]);
 
   // Redirect if not authenticated
@@ -982,38 +1298,77 @@ function CreateListingContent() {
 
   const updateDraft = useCallback((updates: Partial<ListingDraft>) => {
     setDraft((prev) => ({ ...prev, ...updates }));
+    // Clear related errors when field is updated
+    const errorKeys = Object.keys(updates) as (keyof FormErrors)[];
+    setErrors((prev) => {
+      const newErrors = { ...prev };
+      errorKeys.forEach((key) => {
+        if (key in newErrors) delete newErrors[key];
+      });
+      return newErrors;
+    });
   }, []);
 
-  const canProceed = (): boolean => {
-    switch (currentStep) {
-      case 1:
-        return draft.combination.length >= 2 && draft.state !== null && draft.plateType !== null;
-      case 2:
-        return true; // All optional
-      case 3:
-        return draft.price >= 100;
-      case 4:
-        return true; // Photos optional
-      case 5:
-        return true;
-      default:
-        return false;
-    }
-  };
+  const validateDetails = useCallback((): boolean => {
+    const newErrors: FormErrors = {};
 
-  const handleNext = () => {
-    if (currentStep < 5 && canProceed()) {
-      setCurrentStep(currentStep + 1);
+    if (draft.combination.length < 2) {
+      newErrors.combination = '2-10 letters and numbers only';
+    } else if (draft.combination.length > 10) {
+      newErrors.combination = 'Maximum 10 characters';
     }
-  };
 
-  const handleBack = () => {
-    if (currentStep > 1) {
-      setCurrentStep(currentStep - 1);
+    if (!draft.state) {
+      newErrors.state = 'Select a state';
     }
-  };
 
-  // Create listing and get PaymentIntent for embedded checkout
+    if (!draft.plateType) {
+      newErrors.plateType = 'Select a plate type';
+    }
+
+    if (draft.price < 100) {
+      newErrors.price = 'Minimum $100';
+    } else if (draft.price > 10000000) {
+      newErrors.price = 'Maximum $10,000,000';
+    }
+
+    if (draft.description.length > 1000) {
+      newErrors.description = 'Maximum 1000 characters';
+    }
+
+    if (draft.photos.length > MAX_PHOTOS) {
+      newErrors.photos = `Maximum ${MAX_PHOTOS} photos`;
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  }, [draft]);
+
+  const handlePlanContinue = useCallback(() => {
+    if (draft.boostType) {
+      updateDraft({ step: 'details' });
+    }
+  }, [draft.boostType, updateDraft]);
+
+  const handleDetailsContinue = useCallback(() => {
+    if (validateDetails()) {
+      updateDraft({ step: 'pay' });
+    }
+  }, [validateDetails, updateDraft]);
+
+  const handleBack = useCallback(() => {
+    if (draft.step === 'details') {
+      updateDraft({ step: 'plan' });
+    } else if (draft.step === 'pay') {
+      // Reset payment state when going back
+      setClientSecret(null);
+      setPaymentIntentId(null);
+      setSubmitError(null);
+      updateDraft({ step: 'details' });
+    }
+  }, [draft.step, updateDraft]);
+
+  // Create listing and get PaymentIntent
   const handleCreateListing = async () => {
     if (!draft.state || !draft.plateType) return;
 
@@ -1022,9 +1377,7 @@ function CreateListingContent() {
 
     try {
       const token = await getAccessToken();
-      if (!token) {
-        throw new Error('Not authenticated');
-      }
+      if (!token) throw new Error('Not authenticated');
 
       // Create the listing (as draft)
       const listing = await createListing(token, {
@@ -1039,12 +1392,10 @@ function CreateListingContent() {
         isOpenToOffers: draft.isOpenToOffers,
         description: draft.description,
         photoUrls: draft.photos.length > 0 ? draft.photos : undefined,
+        contactPreference: draft.contactPreference,
       });
 
-      // Store the listing slug for success redirect
-      setCreatedListingSlug(listing.slug);
-
-      // Create PaymentIntent for embedded checkout
+      // Create PaymentIntent
       const checkoutResult = await createCheckout(
         token,
         listing.id,
@@ -1063,25 +1414,23 @@ function CreateListingContent() {
       if (checkoutResult.clientSecret && checkoutResult.paymentIntentId) {
         setClientSecret(checkoutResult.clientSecret);
         setPaymentIntentId(checkoutResult.paymentIntentId);
-        setPaymentAmount(checkoutResult.amount || 999);
-        setIsCreatingListing(false);
+        setPaymentAmount(checkoutResult.amount || TIER_PRICES[draft.boostType]);
       } else {
         throw new Error('Failed to create payment');
       }
     } catch (error) {
       console.error('Create listing error:', error);
       setSubmitError(error instanceof Error ? error.message : 'Something went wrong. Please try again.');
+    } finally {
       setIsCreatingListing(false);
     }
   };
 
-  // Handle successful payment
   const handlePaymentSuccess = () => {
     localStorage.removeItem(STORAGE_KEY);
     router.push('/create/success?payment=complete');
   };
 
-  // Handle payment error
   const handlePaymentError = (error: string) => {
     setSubmitError(error);
   };
@@ -1095,94 +1444,82 @@ function CreateListingContent() {
     );
   }
 
-
   // Not authenticated
   if (!isAuthenticated) {
     return null;
   }
 
   return (
-    <div className="min-h-screen bg-[var(--background)]">
+    <div className="min-h-screen flex flex-col bg-[var(--background)]">
       {/* Header */}
-      <div className="sticky top-0 z-20 bg-white border-b border-[var(--border)]">
-        <div className="max-w-4xl mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <Link href="/" className="text-[var(--text-secondary)] hover:text-[var(--text)]">
-              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </Link>
-            <h1 className="text-lg font-semibold text-[var(--text)]">List Your Plate</h1>
-            <div className="w-6" /> {/* Spacer */}
+      <header className="flex-shrink-0 bg-white border-b border-[var(--border)] px-6 py-4">
+        <div className="flex items-center justify-between max-w-5xl mx-auto">
+          <Link
+            href="/"
+            className="text-[var(--text-secondary)] hover:text-[var(--text)] flex items-center gap-2"
+          >
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+            <span className="text-sm sr-only">Close</span>
+          </Link>
+
+          {/* Progress Dots */}
+          <div className="flex items-center gap-2">
+            {(['plan', 'details', 'pay'] as Step[]).map((s, i) => (
+              <div
+                key={s}
+                className={`w-2 h-2 rounded-full transition-all ${
+                  draft.step === s
+                    ? 'w-6 bg-[var(--green)]'
+                    : (['plan', 'details', 'pay'] as Step[]).indexOf(draft.step) > i
+                    ? 'bg-[var(--green)]'
+                    : 'bg-[var(--border)]'
+                }`}
+              />
+            ))}
           </div>
+
+          <div className="w-6" />
         </div>
-      </div>
+      </header>
 
-      <div className="max-w-4xl mx-auto px-4 py-8">
-        <div className="grid lg:grid-cols-5 gap-8">
-          {/* Main Content */}
-          <div className="lg:col-span-3">
-            <StepIndicator currentStep={currentStep} onStepClick={setCurrentStep} />
+      {/* Main Content */}
+      <main className="flex-1 flex items-center justify-center p-6 overflow-y-auto">
+        {draft.step === 'plan' && (
+          <Step1Plan
+            boostType={draft.boostType}
+            onSelect={(type) => updateDraft({ boostType: type })}
+            onContinue={handlePlanContinue}
+          />
+        )}
 
-            {/* Step Content */}
-            <div className="bg-white rounded-2xl border border-[var(--border)] p-6">
-              {currentStep === 1 && <Step1PlateDetails draft={draft} onChange={updateDraft} />}
-              {currentStep === 2 && <Step2Appearance draft={draft} onChange={updateDraft} />}
-              {currentStep === 3 && <Step3Pricing draft={draft} onChange={updateDraft} />}
-              {currentStep === 4 && <Step4Photos draft={draft} onChange={updateDraft} />}
-              {currentStep === 5 && (
-                <Step5Review
-                  draft={draft}
-                  onChange={updateDraft}
-                  isCreatingListing={isCreatingListing}
-                  onCreateListing={handleCreateListing}
-                  error={submitError}
-                  clientSecret={clientSecret}
-                  paymentIntentId={paymentIntentId}
-                  paymentAmount={paymentAmount}
-                  onPaymentSuccess={handlePaymentSuccess}
-                  onPaymentError={handlePaymentError}
-                />
-              )}
+        {draft.step === 'details' && (
+          <Step2Details
+            draft={draft}
+            onChange={updateDraft}
+            errors={errors}
+            onBack={handleBack}
+            onContinue={handleDetailsContinue}
+          />
+        )}
 
-              {/* Navigation */}
-              {currentStep < 5 && (
-                <div className="flex gap-4 mt-8">
-                  {currentStep > 1 && (
-                    <button
-                      type="button"
-                      onClick={handleBack}
-                      className="flex-1 py-3 border border-[var(--border)] text-[var(--text)] font-medium rounded-xl hover:bg-[var(--background-subtle)] transition-colors"
-                    >
-                      Back
-                    </button>
-                  )}
-                  <button
-                    type="button"
-                    onClick={handleNext}
-                    disabled={!canProceed()}
-                    className="flex-1 py-3 bg-[var(--green)] text-white font-medium rounded-xl hover:bg-[#006B31] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                  >
-                    Continue
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Sticky Preview - Desktop */}
-          <div className="hidden lg:block lg:col-span-2">
-            <div className="sticky top-24">
-              <StickyPlatePreview draft={draft} />
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Mobile Preview - Bottom */}
-      <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-[var(--border)] p-4">
-        <StickyPlatePreview draft={draft} />
-      </div>
+        {draft.step === 'pay' && (
+          <Step3Pay
+            draft={draft}
+            onChange={updateDraft}
+            onBack={handleBack}
+            isCreatingListing={isCreatingListing}
+            onCreateListing={handleCreateListing}
+            error={submitError}
+            clientSecret={clientSecret}
+            paymentIntentId={paymentIntentId}
+            paymentAmount={paymentAmount}
+            onPaymentSuccess={handlePaymentSuccess}
+            onPaymentError={handlePaymentError}
+          />
+        )}
+      </main>
     </div>
   );
 }

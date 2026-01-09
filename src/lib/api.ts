@@ -589,6 +589,7 @@ export interface CreateListingData {
   isOpenToOffers: boolean;
   description: string;
   photoUrls?: string[];
+  contactPreference?: string;
 }
 
 interface APICreateListingData {
@@ -603,6 +604,7 @@ interface APICreateListingData {
   is_open_to_offers: boolean;
   description: string;
   photo_urls?: string[];
+  contact_preference?: string;
 }
 
 // Create a new draft listing
@@ -621,6 +623,7 @@ export async function createListing(accessToken: string, data: CreateListingData
     is_open_to_offers: data.isOpenToOffers,
     description: data.description,
     photo_urls: data.photoUrls,
+    contact_preference: data.contactPreference,
   };
 
   const res = await fetch(url, {
