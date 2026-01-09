@@ -1,36 +1,133 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# AusPlates Web
+
+The official website for AusPlates - Australia's marketplace for personalised number plates.
+
+**Live URL:** https://ausplates.app
+
+---
+
+## Tech Stack
+
+- **Framework:** Next.js 16 (App Router)
+- **Language:** TypeScript
+- **Styling:** Tailwind CSS
+- **Payments:** Stripe (embedded checkout)
+- **Auth:** Email/password + Apple Sign In
+- **Hosting:** Vercel
+- **API:** Hono backend on Render.com
+- **Database:** Supabase (PostgreSQL)
+
+---
 
 ## Getting Started
 
-First, run the development server:
+### Prerequisites
+
+- Node.js 18+
+- npm or yarn
+
+### Environment Variables
+
+Create a `.env.local` file:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+NEXT_PUBLIC_API_URL=https://ausplates.onrender.com
+NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_live_...
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### Development
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+npm install
+npm run dev
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Open [http://localhost:3000](http://localhost:3000)
 
-## Learn More
+### Build
 
-To learn more about Next.js, take a look at the following resources:
+```bash
+npm run build
+npm start
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+---
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Project Structure
 
-## Deploy on Vercel
+```
+src/
+├── app/                    # Next.js App Router pages
+│   ├── page.tsx           # Homepage
+│   ├── plates/            # Browse listings
+│   ├── plate/[slug]/      # Listing detail
+│   ├── create/            # Create listing wizard
+│   ├── saved/             # Saved listings
+│   ├── profile/           # User profile
+│   ├── signin/            # Authentication
+│   └── signup/
+├── components/            # React components
+│   ├── ListingCard.tsx
+│   ├── PlatePreview.tsx
+│   └── ...
+├── lib/                   # Utilities
+│   ├── api.ts            # API client
+│   ├── auth.ts           # Auth utilities
+│   └── auth-context.tsx  # Auth context provider
+└── types/                 # TypeScript types
+    └── listing.ts
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+---
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Key Features
+
+| Feature | Route | Description |
+|---------|-------|-------------|
+| Browse Plates | `/plates` | Search and filter listings |
+| View Listing | `/plate/[slug]` | Listing detail with contact |
+| Create Listing | `/create` | 3-step wizard (Plan → Details → Pay) |
+| Saved Plates | `/saved` | User's favourited listings |
+| User Profile | `/profile` | Account management |
+
+---
+
+## Design System
+
+- **Primary:** Australian Green `#00843D`
+- **Accent:** Australian Gold `#FFCD00`
+- **Font:** System fonts (SF Pro on Apple devices)
+
+See `design-system.md` in the main repo for full specifications.
+
+---
+
+## Related Repositories
+
+| Repo | Purpose |
+|------|---------|
+| [ausplates](https://github.com/CDemellis/ausplates) | API, Supabase schema, docs |
+| [ausplates-ios](https://github.com/CDemellis/ausplates-ios) | iOS SwiftUI app |
+
+---
+
+## Deployment
+
+Deployed automatically via Vercel on push to `main`.
+
+### Production Checklist
+
+- [x] Environment variables configured
+- [x] Custom domain (ausplates.app)
+- [x] Stripe live mode enabled
+- [ ] Error tracking (Sentry)
+- [ ] Analytics
+
+---
+
+## Documentation
+
+- `docs/vic-plate-audit.md` - Victoria plate options reference
+- `OUTSTANDING_TASKS.md` - Current TODO list
+
+For full project documentation, see the main `ausplates` repo.
