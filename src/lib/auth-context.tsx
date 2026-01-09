@@ -106,13 +106,41 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const getAccessToken = async (): Promise<string | null> => {
     const { accessToken, refreshToken } = getTokens();
 
-    if (!accessToken) {
-      return null;
+    // If we have an access token, check if it's expired
+    if (accessToken) {
+      try {
+        // Decode JWT to check expiry (JWT format: header.payload.signature)
+        const payload = JSON.parse(atob(accessToken.split('.')[1]));
+        const expiresAt = payload.exp * 1000; // Convert to milliseconds
+        const now = Date.now();
+        const bufferMs = 60 * 1000; // 1 minute buffer
+
+        // If token is not expired (with buffer), return it
+        if (expiresAt > now + bufferMs) {
+          return accessToken;
+        }
+      } catch {
+        // If we can't decode, just return the token and let API handle it
+        return accessToken;
+      }
     }
 
-    // Check if token might be expired (we don't have expiry info here, so just return it)
-    // The API calls will fail and we can handle refresh there if needed
-    return accessToken;
+    // Token is missing or expired, try to refresh
+    if (refreshToken) {
+      try {
+        const { session } = await refreshSession(refreshToken);
+        saveTokens(session);
+        setUser(user); // Keep user state
+        return session.accessToken;
+      } catch {
+        // Refresh failed, clear tokens
+        clearTokens();
+        setUser(null);
+        return null;
+      }
+    }
+
+    return null;
   };
 
   return (
