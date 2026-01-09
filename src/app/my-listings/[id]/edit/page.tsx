@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/lib/auth-context';
 import { getListingBySlug, updateListing, UpdateListingData } from '@/lib/api';
+import { revalidateListing } from '@/app/actions';
 import { PlateView } from '@/components/PlateView';
 import {
   AustralianState,
@@ -217,6 +218,10 @@ export default function EditListingPage({ params }: PageProps) {
       };
 
       await updateListing(token, id, updateData);
+
+      // Revalidate the listing page cache so changes appear immediately
+      await revalidateListing(originalSlug);
+
       setSuccess(true);
 
       // Redirect to listing after short delay
