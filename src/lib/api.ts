@@ -636,8 +636,12 @@ export async function createListing(accessToken: string, data: CreateListingData
   });
 
   if (!res.ok) {
-    const error = await res.json().catch(() => ({}));
-    throw new Error(error.error || 'Failed to create listing');
+    const errorData = await res.json().catch(() => ({}));
+    // Handle Zod validation errors (nested object) or simple string errors
+    const errorMessage = typeof errorData.error === 'string'
+      ? errorData.error
+      : errorData.error?.message || errorData.message || 'Failed to create listing';
+    throw new Error(errorMessage);
   }
 
   const listing = await res.json();
@@ -689,8 +693,9 @@ export async function createCheckout(
   });
 
   if (!res.ok) {
-    const error = await res.json().catch(() => ({}));
-    throw new Error(error.error || 'Failed to create payment intent');
+    const errorData = await res.json().catch(() => ({}));
+    const errorMessage = typeof errorData.error === 'string' ? errorData.error : errorData.error?.message || errorData.message;
+    throw new Error(errorMessage || 'Failed to create payment intent');
   }
 
   const data = await res.json();
@@ -726,8 +731,9 @@ export async function createPaymentIntent(
   });
 
   if (!res.ok) {
-    const error = await res.json().catch(() => ({}));
-    throw new Error(error.error || 'Failed to create payment intent');
+    const errorData = await res.json().catch(() => ({}));
+    const errorMessage = typeof errorData.error === 'string' ? errorData.error : errorData.error?.message || errorData.message;
+    throw new Error(errorMessage || 'Failed to create payment intent');
   }
 
   const data = await res.json();
@@ -761,8 +767,9 @@ export async function confirmPayment(
   });
 
   if (!res.ok) {
-    const error = await res.json().catch(() => ({}));
-    throw new Error(error.error || 'Failed to confirm payment');
+    const errorData = await res.json().catch(() => ({}));
+    const errorMessage = typeof errorData.error === 'string' ? errorData.error : errorData.error?.message || errorData.message;
+    throw new Error(errorMessage || 'Failed to confirm payment');
   }
 
   const data = await res.json();
@@ -853,8 +860,9 @@ export async function updateUserProfile(
   });
 
   if (!res.ok) {
-    const error = await res.json().catch(() => ({}));
-    throw new Error(error.error || 'Failed to update profile');
+    const errorData = await res.json().catch(() => ({}));
+    const errorMessage = typeof errorData.error === 'string' ? errorData.error : errorData.error?.message || errorData.message;
+    throw new Error(errorMessage || 'Failed to update profile');
   }
 
   const result = await res.json();
@@ -974,8 +982,9 @@ export async function updateListing(
   });
 
   if (!res.ok) {
-    const error = await res.json().catch(() => ({}));
-    throw new Error(error.error || 'Failed to update listing');
+    const errorData = await res.json().catch(() => ({}));
+    const errorMessage = typeof errorData.error === 'string' ? errorData.error : errorData.error?.message || errorData.message;
+    throw new Error(errorMessage || 'Failed to update listing');
   }
 
   return { success: true };
@@ -995,8 +1004,9 @@ export async function deleteListing(
   });
 
   if (!res.ok) {
-    const error = await res.json().catch(() => ({}));
-    throw new Error(error.error || 'Failed to delete listing');
+    const errorData = await res.json().catch(() => ({}));
+    const errorMessage = typeof errorData.error === 'string' ? errorData.error : errorData.error?.message || errorData.message;
+    throw new Error(errorMessage || 'Failed to delete listing');
   }
 
   return { success: true };
@@ -1025,8 +1035,9 @@ export async function uploadPhoto(
   });
 
   if (!res.ok) {
-    const error = await res.json().catch(() => ({}));
-    throw new Error(error.error || 'Failed to upload photo');
+    const errorData = await res.json().catch(() => ({}));
+    const errorMessage = typeof errorData.error === 'string' ? errorData.error : errorData.error?.message || errorData.message;
+    throw new Error(errorMessage || 'Failed to upload photo');
   }
 
   return res.json();
@@ -1047,8 +1058,9 @@ export async function deletePhoto(
   });
 
   if (!res.ok) {
-    const error = await res.json().catch(() => ({}));
-    throw new Error(error.error || 'Failed to delete photo');
+    const errorData = await res.json().catch(() => ({}));
+    const errorMessage = typeof errorData.error === 'string' ? errorData.error : errorData.error?.message || errorData.message;
+    throw new Error(errorMessage || 'Failed to delete photo');
   }
 
   return { success: true };
