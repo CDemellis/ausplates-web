@@ -94,7 +94,7 @@ export async function signIn(email: string, password: string): Promise<AuthRespo
     throw error;
   }
 
-  // Transform snake_case to camelCase
+  // Transform user from snake_case to camelCase (session is already camelCase from API)
   return {
     user: {
       id: data.user.id,
@@ -103,11 +103,7 @@ export async function signIn(email: string, password: string): Promise<AuthRespo
       avatarUrl: data.user.avatar_url,
       emailVerified: data.user.email_verified,
     },
-    session: {
-      accessToken: data.session.access_token,
-      refreshToken: data.session.refresh_token,
-      expiresAt: data.session.expires_at,
-    },
+    session: data.session,
   };
 }
 
