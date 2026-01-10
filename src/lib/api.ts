@@ -782,6 +782,64 @@ export async function confirmPayment(
 }
 
 // ============================================
+// PROMO CODE API
+// ============================================
+
+export interface PromoValidationResult {
+  valid: boolean;
+  type?: string;
+  message: string;
+  error?: string;
+}
+
+export async function validatePromoCode(code: string): Promise<PromoValidationResult> {
+  const url = `${API_BASE_URL}/api/promo/validate`;
+
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ code }),
+  });
+
+  const data = await res.json();
+  return {
+    valid: data.valid,
+    type: data.type,
+    message: data.message,
+    error: data.error,
+  };
+}
+
+export async function redeemPromoCode(
+  accessToken: string,
+  code: string,
+  listingId: string
+): Promise<{ success: boolean; message: string; error?: string }> {
+  const url = `${API_BASE_URL}/api/promo/redeem`;
+
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      code,
+      listing_id: listingId,
+    }),
+  });
+
+  const data = await res.json();
+  return {
+    success: data.success,
+    message: data.message,
+    error: data.error,
+  };
+}
+
+// ============================================
 // USER PROFILE API
 // ============================================
 

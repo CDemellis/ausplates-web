@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { useAuth } from '@/lib/auth-context';
-import { createCheckout, confirmPayment } from '@/lib/api';
+import { createCheckout, confirmPayment, validatePromoCode, redeemPromoCode } from '@/lib/api';
 import { PlateView } from '@/components/PlateView';
 import { PLATE_TYPE_NAMES } from '@/types/listing';
 
@@ -177,6 +177,14 @@ export default function PayDraftListingPage({ params }: PageProps) {
   const [paymentAmount, setPaymentAmount] = useState(0);
   const [paymentError, setPaymentError] = useState<string | null>(null);
 
+  // Promo code validation state
+  const [isValidatingPromo, setIsValidatingPromo] = useState(false);
+  const [promoValidation, setPromoValidation] = useState<{
+    valid: boolean;
+    type?: string;
+    message: string;
+  } | null>(null);
+
   // Redirect if not authenticated
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -234,6 +242,30 @@ export default function PayDraftListingPage({ params }: PageProps) {
     fetchListing();
   }, [isAuthenticated, id, getAccessToken, user?.id, router]);
 
+  const handleApplyPromo = async () => {
+    if (!promoCode.trim()) return;
+
+    setIsValidatingPromo(true);
+    setPromoValidation(null);
+    setPaymentError(null);
+
+    try {
+      const result = await validatePromoCode(promoCode);
+      setPromoValidation({
+        valid: result.valid,
+        type: result.type,
+        message: result.message,
+      });
+    } catch (err) {
+      setPromoValidation({
+        valid: false,
+        message: err instanceof Error ? err.message : 'Failed to validate code',
+      });
+    } finally {
+      setIsValidatingPromo(false);
+    }
+  };
+
   const handlePay = async () => {
     if (!listing) return;
 
@@ -243,6 +275,17 @@ export default function PayDraftListingPage({ params }: PageProps) {
     try {
       const token = await getAccessToken();
       if (!token) throw new Error('Not authenticated');
+
+      // If promo code is validated and gives free listing, use redeem endpoint
+      if (promoValidation?.valid && promoValidation.type === 'free_listing') {
+        const redeemResult = await redeemPromoCode(token, promoCode, listing.id);
+        if (redeemResult.success) {
+          router.push(`/plate/${listing.slug}?published=true`);
+          return;
+        } else {
+          throw new Error(redeemResult.message || 'Failed to redeem promo code');
+        }
+      }
 
       const result = await createCheckout(
         token,
@@ -270,6 +313,11 @@ export default function PayDraftListingPage({ params }: PageProps) {
       setIsCreatingPayment(false);
     }
   };
+
+  // Calculate display price (0 if valid free_listing promo)
+  const displayPrice = promoValidation?.valid && promoValidation.type === 'free_listing'
+    ? 0
+    : TIER_PRICES[boostType];
 
   const handlePaymentSuccess = () => {
     if (listing) {
@@ -574,27 +622,80 @@ export default function PayDraftListingPage({ params }: PageProps) {
             <label className="block text-sm font-medium text-[var(--text)] mb-2">
               Promo Code
             </label>
-            <input
-              type="text"
-              value={promoCode}
-              onChange={(e) => setPromoCode(e.target.value.toUpperCase())}
-              placeholder="Enter code"
-              className="w-full px-4 py-3 border border-[var(--border)] rounded-xl focus:outline-none focus:ring-2 focus:ring-[var(--green)] focus:border-transparent uppercase"
-            />
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={promoCode}
+                onChange={(e) => {
+                  setPromoCode(e.target.value.toUpperCase());
+                  // Clear validation when code changes
+                  if (promoValidation) setPromoValidation(null);
+                }}
+                placeholder="Enter code"
+                disabled={promoValidation?.valid}
+                className="flex-1 px-4 py-3 border border-[var(--border)] rounded-xl focus:outline-none focus:ring-2 focus:ring-[var(--green)] focus:border-transparent uppercase disabled:bg-[var(--background-subtle)] disabled:text-[var(--text-secondary)]"
+              />
+              {promoValidation?.valid ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPromoCode('');
+                    setPromoValidation(null);
+                  }}
+                  className="px-4 py-3 text-[var(--text-secondary)] border border-[var(--border)] rounded-xl hover:bg-[var(--background-subtle)] transition-colors"
+                >
+                  Clear
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleApplyPromo}
+                  disabled={!promoCode.trim() || isValidatingPromo}
+                  className="px-6 py-3 bg-[var(--green)] text-white font-medium rounded-xl hover:bg-[#006B31] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  {isValidatingPromo ? 'Checking...' : 'Apply'}
+                </button>
+              )}
+            </div>
+
+            {/* Promo validation message */}
+            {promoValidation && (
+              <div className={`mt-2 p-3 rounded-lg ${
+                promoValidation.valid
+                  ? 'bg-green-50 border border-green-200'
+                  : 'bg-red-50 border border-red-200'
+              }`}>
+                <p className={`text-sm ${promoValidation.valid ? 'text-green-700' : 'text-red-600'}`}>
+                  {promoValidation.message}
+                </p>
+              </div>
+            )}
           </div>
 
           <div className="flex justify-between items-center pt-4 border-t border-[var(--border)]">
             <div>
               <span className="text-[var(--text)] font-medium">Listing Fee</span>
-              {boostType !== 'none' && (
+              {boostType !== 'none' && !promoValidation?.valid && (
                 <p className="text-xs text-[var(--text-muted)]">
                   {boostType === '30day' ? '30 days featured' : '7 days featured'}
                 </p>
               )}
+              {promoValidation?.valid && promoValidation.type === 'free_listing' && (
+                <p className="text-xs text-[var(--green)] font-medium">Free with promo code!</p>
+              )}
             </div>
-            <span className="text-2xl font-bold text-[var(--text)]">
-              ${(TIER_PRICES[boostType] / 100).toFixed(2)}
-            </span>
+            <div className="text-right">
+              {promoValidation?.valid && promoValidation.type === 'free_listing' && (
+                <span className="text-lg text-[var(--text-muted)] line-through mr-2">
+                  ${(TIER_PRICES[boostType] / 100).toFixed(2)}
+                </span>
+              )}
+              <span className={`text-2xl font-bold ${
+                displayPrice === 0 ? 'text-[var(--green)]' : 'text-[var(--text)]'
+              }`}>
+                ${(displayPrice / 100).toFixed(2)}
+              </span>
+            </div>
           </div>
         </div>
 
@@ -613,20 +714,29 @@ export default function PayDraftListingPage({ params }: PageProps) {
           {isCreatingPayment ? (
             <>
               <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-              Preparing payment...
+              {displayPrice === 0 ? 'Publishing...' : 'Preparing payment...'}
+            </>
+          ) : displayPrice === 0 ? (
+            <>
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+              Publish Free
             </>
           ) : (
             <>
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
               </svg>
-              Pay ${(TIER_PRICES[boostType] / 100).toFixed(2)} & Publish
+              Pay ${(displayPrice / 100).toFixed(2)} & Publish
             </>
           )}
         </button>
 
         <p className="mt-4 text-xs text-center text-[var(--text-muted)]">
-          Secure payment powered by Stripe. Your listing will be published immediately after payment.
+          {displayPrice === 0
+            ? 'Your listing will be published immediately.'
+            : 'Secure payment powered by Stripe. Your listing will be published immediately after payment.'}
         </p>
       </div>
     </div>
