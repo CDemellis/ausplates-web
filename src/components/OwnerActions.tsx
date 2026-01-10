@@ -55,7 +55,13 @@ export function OwnerActions({ listingId, sellerId, status }: OwnerActionsProps)
       const token = await getAccessToken();
       if (!token) throw new Error('Not authenticated');
 
-      await updateListing(token, listingId, { status: newStatus });
+      const result = await updateListing(token, listingId, { status: newStatus });
+
+      // Verify the status actually changed
+      if (result.listing && result.listing.status !== newStatus) {
+        throw new Error(`Failed to ${newStatus === 'draft' ? 'unpublish' : 'publish'} listing. Please try again.`);
+      }
+
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to update listing');

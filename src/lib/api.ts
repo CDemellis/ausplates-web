@@ -1011,11 +1011,20 @@ export interface UpdateListingData {
   photoUrls?: string[];
 }
 
+export interface UpdateListingResult {
+  success: boolean;
+  listing?: {
+    id: string;
+    status: string;
+    [key: string]: any;
+  };
+}
+
 export async function updateListing(
   accessToken: string,
   listingId: string,
   data: UpdateListingData
-): Promise<{ success: boolean }> {
+): Promise<UpdateListingResult> {
   const url = `${API_BASE_URL}/api/listings/${listingId}`;
 
   const apiData: Record<string, any> = {};
@@ -1047,7 +1056,8 @@ export async function updateListing(
     throw new Error(errorMessage || 'Failed to update listing');
   }
 
-  return { success: true };
+  const listing = await res.json();
+  return { success: true, listing };
 }
 
 export async function deleteListing(
