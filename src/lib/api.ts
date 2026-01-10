@@ -992,8 +992,10 @@ export async function getUserListings(
     throw new Error('Failed to fetch listings');
   }
 
-  const data = await res.json();
-  return data.map((listing: any) => ({
+  const response = await res.json();
+  // API returns paginated format: { data: [...], count, hasMore }
+  const listings = response.data || response;
+  return listings.map((listing: any) => ({
     id: listing.id,
     combination: listing.combination,
     state: listing.state,
