@@ -94,7 +94,21 @@ export async function signIn(email: string, password: string): Promise<AuthRespo
     throw error;
   }
 
-  return data;
+  // Transform snake_case to camelCase
+  return {
+    user: {
+      id: data.user.id,
+      email: data.user.email,
+      fullName: data.user.full_name,
+      avatarUrl: data.user.avatar_url,
+      emailVerified: data.user.email_verified,
+    },
+    session: {
+      accessToken: data.session.access_token,
+      refreshToken: data.session.refresh_token,
+      expiresAt: data.session.expires_at,
+    },
+  };
 }
 
 // Forgot password
