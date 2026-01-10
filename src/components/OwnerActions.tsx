@@ -10,9 +10,10 @@ interface OwnerActionsProps {
   listingId: string;
   sellerId: string;
   status: string;
+  hasPaid?: boolean;
 }
 
-export function OwnerActions({ listingId, sellerId, status }: OwnerActionsProps) {
+export function OwnerActions({ listingId, sellerId, status, hasPaid = false }: OwnerActionsProps) {
   const router = useRouter();
   const { user, isAuthenticated, getAccessToken } = useAuth();
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -42,8 +43,8 @@ export function OwnerActions({ listingId, sellerId, status }: OwnerActionsProps)
   };
 
   const handleStatusChange = async (newStatus: 'active' | 'draft') => {
-    // Draft listings need payment to be published - redirect to payment flow
-    if (status === 'draft' && newStatus === 'active') {
+    // Draft listings need payment to be published - unless already paid
+    if (status === 'draft' && newStatus === 'active' && !hasPaid) {
       router.push(`/my-listings/${listingId}/pay`);
       return;
     }
@@ -116,10 +117,21 @@ export function OwnerActions({ listingId, sellerId, status }: OwnerActionsProps)
               disabled={isUpdating}
               className="flex items-center gap-2 px-4 py-2 bg-[var(--green)]/10 text-[var(--green)] font-medium rounded-xl hover:bg-[var(--green)]/20 transition-colors disabled:opacity-50"
             >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
-              </svg>
-              Complete Payment
+              {hasPaid ? (
+                <>
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  {isUpdating ? 'Publishing...' : 'Republish'}
+                </>
+              ) : (
+                <>
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
+                  </svg>
+                  Complete Payment
+                </>
+              )}
             </button>
           )}
 

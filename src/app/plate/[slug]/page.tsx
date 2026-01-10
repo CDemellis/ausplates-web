@@ -248,6 +248,7 @@ export default async function ListingDetailPage({ params, searchParams }: PagePr
                   listingId={listing.id}
                   sellerId={listing.seller.id}
                   status={listing.status}
+                  hasPaid={listing.hasPaid}
                 />
               )}
 

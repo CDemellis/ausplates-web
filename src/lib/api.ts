@@ -24,6 +24,8 @@ interface APIListing {
   photos?: { id: string; url: string; order: number }[];
   created_at: string;
   updated_at: string;
+  // Whether listing has been paid for (allows free republishing)
+  has_paid?: boolean;
   seller?: {
     id: string;
     full_name: string;
@@ -89,6 +91,7 @@ function transformListingWithSeller(api: APIListing): ListingWithSeller {
       listingsCount: 0,
       soldCount: 0,
     },
+    hasPaid: api.has_paid,
   };
 }
 
@@ -832,9 +835,19 @@ export async function redeemPromoCode(
   });
 
   const data = await res.json();
+
+  // Handle non-200 responses
+  if (!res.ok) {
+    return {
+      success: false,
+      message: data.message || 'Failed to redeem promo code',
+      error: data.error || 'redemption_failed',
+    };
+  }
+
   return {
-    success: data.success,
-    message: data.message,
+    success: data.success ?? true,
+    message: data.message || 'Promo code redeemed successfully',
     error: data.error,
   };
 }
