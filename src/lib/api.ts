@@ -968,6 +968,7 @@ export interface UserListing {
   viewsCount: number;
   isFeatured: boolean;
   boostExpiresAt?: string;
+  hasPaid: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -1004,6 +1005,7 @@ export async function getUserListings(
     viewsCount: listing.views_count,
     isFeatured: listing.is_featured,
     boostExpiresAt: listing.boost_expires_at,
+    hasPaid: listing.has_paid || false,
     createdAt: listing.created_at,
     updatedAt: listing.updated_at,
   }));

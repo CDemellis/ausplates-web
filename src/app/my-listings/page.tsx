@@ -70,6 +70,14 @@ export default function MyListingsPage() {
   };
 
   const handleStatusChange = async (listingId: string, newStatus: 'active' | 'draft') => {
+    // For publishing drafts, check if payment is required
+    const listing = listings.find(l => l.id === listingId);
+    if (listing?.status === 'draft' && newStatus === 'active' && !listing.hasPaid) {
+      // Redirect to payment page
+      router.push(`/my-listings/${listingId}/pay`);
+      return;
+    }
+
     try {
       const token = await getAccessToken();
       if (!token) throw new Error('Not authenticated');
@@ -256,7 +264,7 @@ export default function MyListingsPage() {
                         onClick={() => handleStatusChange(listing.id, 'active')}
                         className="px-3 py-1.5 text-sm font-medium text-[var(--green)] bg-[var(--green)]/10 rounded-lg hover:bg-[var(--green)]/20 transition-colors"
                       >
-                        Publish
+                        {listing.hasPaid ? 'Republish' : 'Complete Payment'}
                       </button>
                     )}
                     <button
