@@ -1075,7 +1075,9 @@ function Step3Pay({
     ? 'border-[var(--green)] shadow-lg shadow-green-100'
     : 'border-[var(--border)]';
 
-  const total = TIER_PRICES[draft.boostType];
+  const basePrice = TIER_PRICES[draft.boostType];
+  // If promo is valid, price is $0
+  const total = promoValidation?.valid ? 0 : basePrice;
 
   // If we have clientSecret, show Stripe payment form
   if (clientSecret && paymentIntentId) {
@@ -1223,7 +1225,16 @@ function Step3Pay({
                   </p>
                 )}
               </div>
-              <span className="text-2xl font-bold text-[var(--text)]">${(total / 100).toFixed(2)}</span>
+              <div className="text-right">
+                {promoValidation?.valid ? (
+                  <>
+                    <span className="text-lg text-[var(--text-muted)] line-through mr-2">${(basePrice / 100).toFixed(2)}</span>
+                    <span className="text-2xl font-bold text-[var(--green)]">$0.00</span>
+                  </>
+                ) : (
+                  <span className="text-2xl font-bold text-[var(--text)]">${(total / 100).toFixed(2)}</span>
+                )}
+              </div>
             </div>
           </div>
 
@@ -1251,7 +1262,14 @@ function Step3Pay({
               {isCreatingListing ? (
                 <>
                   <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  Preparing...
+                  {promoValidation?.valid ? 'Publishing...' : 'Preparing...'}
+                </>
+              ) : promoValidation?.valid ? (
+                <>
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                  Publish Free
                 </>
               ) : (
                 <>
