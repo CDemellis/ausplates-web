@@ -817,7 +817,8 @@ export async function createBoostCheckout(
     clientSecret: data.client_secret,
     paymentIntentId: data.payment_intent_id,
     amount: data.amount,
-    free: false,
+    free: data.free || false,
+    listingSlug: data.listing_slug,
   };
 }
 
