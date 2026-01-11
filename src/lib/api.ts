@@ -784,6 +784,72 @@ export async function confirmPayment(
   };
 }
 
+// Create boost checkout for existing listing
+export async function createBoostCheckout(
+  accessToken: string,
+  listingId: string,
+  boostType: '7day' | '30day'
+): Promise<CheckoutResponse> {
+  const url = `${API_BASE_URL}/api/payments/create-boost-checkout`;
+
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      listing_id: listingId,
+      boost_type: boostType,
+    }),
+  });
+
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    const errorMessage = typeof errorData.error === 'string' ? errorData.error : errorData.error?.message || errorData.message;
+    throw new Error(errorMessage || 'Failed to create boost checkout');
+  }
+
+  const data = await res.json();
+  return {
+    clientSecret: data.client_secret,
+    paymentIntentId: data.payment_intent_id,
+    amount: data.amount,
+    free: false,
+  };
+}
+
+// Confirm boost payment and activate boost
+export async function confirmBoostPayment(
+  accessToken: string,
+  paymentIntentId: string
+): Promise<{ success: boolean; listingSlug?: string }> {
+  const url = `${API_BASE_URL}/api/payments/confirm-boost`;
+
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      payment_intent_id: paymentIntentId,
+    }),
+  });
+
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    const errorMessage = typeof errorData.error === 'string' ? errorData.error : errorData.error?.message || errorData.message;
+    throw new Error(errorMessage || 'Failed to confirm boost payment');
+  }
+
+  const data = await res.json();
+  return {
+    success: data.success,
+    listingSlug: data.listing_slug,
+  };
+}
+
 // ============================================
 // PROMO CODE API
 // ============================================

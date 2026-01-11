@@ -119,6 +119,14 @@ export default function MyListingsPage() {
     return boostActive && listing.bumpsRemaining > 0;
   };
 
+  // Check if a listing can be boosted (active, no current boost)
+  const canBoost = (listing: UserListing) => {
+    if (listing.status !== 'active') return false;
+    if (!listing.isFeatured || !listing.boostExpiresAt) return true;
+    // Can boost if current boost has expired
+    return new Date(listing.boostExpiresAt) <= new Date();
+  };
+
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'active':
@@ -279,6 +287,18 @@ export default function MyListingsPage() {
                     >
                       Edit
                     </Link>
+                    {/* Boost button for non-boosted active listings */}
+                    {canBoost(listing) && (
+                      <Link
+                        href={`/my-listings/${listing.id}/boost`}
+                        className="px-3 py-1.5 text-sm font-medium text-[var(--gold)] bg-[var(--gold)]/10 rounded-lg hover:bg-[var(--gold)]/20 transition-colors flex items-center gap-1"
+                      >
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                        </svg>
+                        Boost
+                      </Link>
+                    )}
                     {/* Bump button for Boost Pro listings */}
                     {canBump(listing) && (
                       <button
