@@ -1264,8 +1264,17 @@ function CreateListingContent() {
   const [paymentIntentId, setPaymentIntentId] = useState<string | null>(null);
   const [paymentAmount, setPaymentAmount] = useState(0);
 
-  // Load draft from localStorage
+  // Check URL for fresh=true to clear draft
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('fresh') === 'true') {
+      localStorage.removeItem(STORAGE_KEY);
+      // Remove the query param from URL
+      window.history.replaceState({}, '', '/create');
+      return;
+    }
+
+    // Load draft from localStorage
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved) {
       try {
@@ -1480,7 +1489,17 @@ function CreateListingContent() {
             ))}
           </div>
 
-          <div className="w-6" />
+          {/* Start Fresh link - only show if draft has data */}
+          {(draft.combination || draft.step !== 'plan') ? (
+            <Link
+              href="/create?fresh=true"
+              className="text-xs text-[var(--text-muted)] hover:text-[var(--green)] transition-colors"
+            >
+              Start fresh
+            </Link>
+          ) : (
+            <div className="w-14" />
+          )}
         </div>
       </header>
 
