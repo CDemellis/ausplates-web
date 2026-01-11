@@ -18,8 +18,8 @@ const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY 
 type BoostType = '7day' | '30day';
 
 const BOOST_PRICES = {
-  '7day': 999,   // $9.99
-  '30day': 1500, // $15.00
+  '7day': 1998,  // $19.98
+  '30day': 2499, // $24.99
 } as const;
 
 const BOOST_INFO: Record<BoostType, { name: string; features: string[] }> = {
@@ -458,7 +458,7 @@ export default function BoostListingPage({ params }: PageProps) {
                 <Star />
                 <h3 className="font-semibold text-[var(--text)]">Boost</h3>
               </div>
-              <p className="text-2xl font-bold text-[var(--text)]">$9.99</p>
+              <p className="text-2xl font-bold text-[var(--text)]">$19.98</p>
               <p className="text-sm text-[var(--text-muted)] mb-3">7 days featured</p>
               <div className="space-y-2">
                 {BOOST_INFO['7day'].features.map((feature, i) => (
@@ -494,7 +494,7 @@ export default function BoostListingPage({ params }: PageProps) {
                 <Star />
                 <h3 className="font-semibold text-[var(--text)]">Boost Pro</h3>
               </div>
-              <p className="text-2xl font-bold text-[var(--text)]">$15.00</p>
+              <p className="text-2xl font-bold text-[var(--text)]">$24.99</p>
               <p className="text-sm text-[var(--text-muted)] mb-3">30 days featured</p>
               <div className="space-y-2">
                 {BOOST_INFO['30day'].features.map((feature, i) => (
