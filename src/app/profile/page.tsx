@@ -1,11 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { getTokens, getLinkingStatus, linkEmail, LinkingStatus } from '@/lib/auth';
-import { getSavedListings, getUserProfile, updateUserProfile, UserProfile, UpdateProfileData } from '@/lib/api';
+import { getSavedListings, getUserProfile, updateUserProfile, uploadPhoto, UserProfile, UpdateProfileData } from '@/lib/api';
 import { Listing } from '@/types/listing';
 import { ListingCard, ListingCardSkeleton } from '@/components/ListingCard';
 
@@ -157,7 +157,12 @@ function EditProfileSection({ user, onUpdate }: { user: { fullName: string; avat
   // Form state
   const [fullName, setFullName] = useState(user.fullName);
   const [phoneNumber, setPhoneNumber] = useState('');
+  const [avatarUrl, setAvatarUrl] = useState(user.avatarUrl || '');
   const [profile, setProfile] = useState<UserProfile | null>(null);
+
+  // Avatar upload
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
 
   // Notification preferences
   const [notifications, setNotifications] = useState({
@@ -180,11 +185,48 @@ function EditProfileSection({ user, onUpdate }: { user: { fullName: string; avat
       setProfile(data);
       setFullName(data.fullName);
       setPhoneNumber(data.phoneNumber || '');
+      setAvatarUrl(data.avatarUrl || '');
       if (data.notificationPreferences) {
         setNotifications(data.notificationPreferences);
       }
     } catch (err) {
       console.error('Failed to load profile:', err);
+    }
+  };
+
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      setError('Please select an image file');
+      return;
+    }
+
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      setError('Image must be less than 5MB');
+      return;
+    }
+
+    const { accessToken } = getTokens();
+    if (!accessToken) return;
+
+    setIsUploadingAvatar(true);
+    setError('');
+
+    try {
+      const result = await uploadPhoto(accessToken, file);
+      setAvatarUrl(result.url);
+    } catch (err) {
+      setError((err as Error).message || 'Failed to upload image');
+    } finally {
+      setIsUploadingAvatar(false);
+      // Reset input so same file can be selected again
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
     }
   };
 
@@ -206,6 +248,7 @@ function EditProfileSection({ user, onUpdate }: { user: { fullName: string; avat
       const updateData: UpdateProfileData = {
         fullName: fullName.trim(),
         phoneNumber: phoneNumber.trim() || undefined,
+        avatarUrl: avatarUrl || undefined,
         notificationPreferences: notifications,
       };
 
@@ -228,11 +271,13 @@ function EditProfileSection({ user, onUpdate }: { user: { fullName: string; avat
     if (profile) {
       setFullName(profile.fullName);
       setPhoneNumber(profile.phoneNumber || '');
+      setAvatarUrl(profile.avatarUrl || '');
       if (profile.notificationPreferences) {
         setNotifications(profile.notificationPreferences);
       }
     } else {
       setFullName(user.fullName);
+      setAvatarUrl(user.avatarUrl || '');
     }
   };
 
@@ -271,6 +316,50 @@ function EditProfileSection({ user, onUpdate }: { user: { fullName: string; avat
 
         {isEditing ? (
           <form onSubmit={handleSave} className="space-y-6">
+            {/* Avatar Upload */}
+            <div className="flex flex-col items-center">
+              <div className="relative">
+                {avatarUrl ? (
+                  <img
+                    src={avatarUrl}
+                    alt={fullName}
+                    className="w-24 h-24 rounded-full object-cover"
+                  />
+                ) : (
+                  <div className="w-24 h-24 rounded-full bg-[var(--green)]/10 flex items-center justify-center">
+                    <span className="text-3xl font-semibold text-[var(--green)]">
+                      {fullName.charAt(0).toUpperCase()}
+                    </span>
+                  </div>
+                )}
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isUploadingAvatar}
+                  className="absolute bottom-0 right-0 w-8 h-8 bg-[var(--green)] rounded-full flex items-center justify-center text-white hover:bg-[#006B31] transition-colors disabled:opacity-50"
+                >
+                  {isUploadingAvatar ? (
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                  )}
+                </button>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleAvatarUpload}
+                  className="hidden"
+                />
+              </div>
+              <p className="text-sm text-[var(--text-muted)] mt-2">
+                Click the camera icon to change your photo
+              </p>
+            </div>
+
             {/* Basic Info */}
             <div className="space-y-4">
               <div>
