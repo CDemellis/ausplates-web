@@ -1409,6 +1409,10 @@ function CreateListingContent() {
         contactPreference: draft.contactPreference,
       });
 
+      // Clear localStorage draft now that listing is saved to DB
+      // User can find their draft listing in "My Listings" if they abandon payment
+      localStorage.removeItem(STORAGE_KEY);
+
       // Create PaymentIntent
       const checkoutResult = await createCheckout(
         token,
