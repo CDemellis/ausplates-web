@@ -1258,19 +1258,22 @@ function CreateListingContent() {
   const [errors, setErrors] = useState<FormErrors>({});
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [isCreatingListing, setIsCreatingListing] = useState(false);
+  const [draftInitialized, setDraftInitialized] = useState(false);
 
   // Payment state
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [paymentIntentId, setPaymentIntentId] = useState<string | null>(null);
   const [paymentAmount, setPaymentAmount] = useState(0);
 
-  // Check URL for fresh=true to clear draft
+  // Check URL for fresh=true to clear draft, or load from localStorage
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get('fresh') === 'true') {
       localStorage.removeItem(STORAGE_KEY);
+      setDraft(INITIAL_DRAFT);
       // Remove the query param from URL
       window.history.replaceState({}, '', '/create');
+      setDraftInitialized(true);
       return;
     }
 
@@ -1290,13 +1293,15 @@ function CreateListingContent() {
         // Ignore parse errors
       }
     }
+    setDraftInitialized(true);
   }, []);
 
-  // Save draft to localStorage on changes
+  // Save draft to localStorage on changes (only after initialization)
   useEffect(() => {
+    if (!draftInitialized) return;
     const toSave = { ...draft, savedAt: Date.now() };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(toSave));
-  }, [draft]);
+  }, [draft, draftInitialized]);
 
   // Redirect if not authenticated
   useEffect(() => {
