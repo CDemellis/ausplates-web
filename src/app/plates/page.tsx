@@ -1,7 +1,7 @@
 import { Metadata } from 'next';
 import { Suspense } from 'react';
 import Link from 'next/link';
-import { ListingCard } from '@/components/ListingCard';
+import { ListingsGrid } from '@/components/ListingsGrid';
 import { FilterPanel } from '@/components/FilterPanel';
 import { getListings } from '@/lib/api';
 import {
@@ -9,7 +9,6 @@ import {
   PlateType,
   PlateColorScheme,
   PlateSizeFormat,
-  Listing,
 } from '@/types/listing';
 
 export const metadata: Metadata = {
@@ -59,7 +58,7 @@ export default async function BrowsePlatesPage(props: {
   const sort = (searchParams.sort || 'recent') as 'recent' | 'price_asc' | 'price_desc' | 'views';
 
   // Fetch listings from API with all filters
-  let listings: Listing[] = [];
+  let listings: Awaited<ReturnType<typeof getListings>>['listings'] = [];
   let total = 0;
 
   try {
@@ -141,26 +140,30 @@ export default async function BrowsePlatesPage(props: {
               </details>
             </div>
 
-            {/* Results Count - with live region for screen readers */}
-            <div className="flex items-center justify-between mb-6">
-              <p className="text-sm text-[var(--text-muted)]">
-                {total > 0 ? `Showing ${listings.length} of ${total.toLocaleString()} plates` : 'No plates found'}
-              </p>
-              {/* Live region for screen reader announcements */}
-              <div className="sr-only" role="status" aria-live="polite" aria-atomic="true">
-                {total > 0
-                  ? `${total} plates found. Showing ${listings.length} results.`
-                  : 'No plates found matching your filters.'}
-              </div>
+            {/* Live region for screen reader announcements */}
+            <div className="sr-only" role="status" aria-live="polite" aria-atomic="true">
+              {total > 0
+                ? `${total} plates found.`
+                : 'No plates found matching your filters.'}
             </div>
 
-            {/* Listings Grid */}
+            {/* Listings Grid with Load More */}
             {listings.length > 0 ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
-                {listings.map((listing) => (
-                  <ListingCard key={listing.id} listing={listing} />
-                ))}
-              </div>
+              <ListingsGrid
+                initialListings={listings}
+                total={total}
+                pageSize={24}
+                filters={{
+                  query,
+                  states,
+                  plateTypes,
+                  colorSchemes,
+                  sizeFormats,
+                  minPrice,
+                  maxPrice,
+                  sort,
+                }}
+              />
             ) : (
               <div className="text-center py-16 bg-white rounded-xl border border-[var(--border)]">
                 <svg
