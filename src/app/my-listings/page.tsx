@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/lib/auth-context';
-import { getUserListings, deleteListing, updateListing, UserListing } from '@/lib/api';
+import { getUserListings, deleteListing, updateListing, bumpListing, UserListing } from '@/lib/api';
 import { PlateView } from '@/components/PlateView';
 import { formatPrice } from '@/types/listing';
 
@@ -20,6 +20,7 @@ export default function MyListingsPage() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [showDeleteModal, setShowDeleteModal] = useState<string | null>(null);
+  const [bumpingId, setBumpingId] = useState<string | null>(null);
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -89,6 +90,33 @@ export default function MyListingsPage() {
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to update listing');
     }
+  };
+
+  const handleBump = async (listingId: string) => {
+    setBumpingId(listingId);
+    try {
+      const token = await getAccessToken();
+      if (!token) throw new Error('Not authenticated');
+
+      const result = await bumpListing(token, listingId);
+      // Update the listing in state with new bump count
+      setListings(listings.map(l =>
+        l.id === listingId
+          ? { ...l, bumpsRemaining: result.bumpsRemaining, bumpedAt: result.bumpedAt }
+          : l
+      ));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to bump listing');
+    } finally {
+      setBumpingId(null);
+    }
+  };
+
+  // Check if a listing can be bumped (has active boost and bumps remaining)
+  const canBump = (listing: UserListing) => {
+    if (!listing.isFeatured || !listing.boostExpiresAt) return false;
+    const boostActive = new Date(listing.boostExpiresAt) > new Date();
+    return boostActive && listing.bumpsRemaining > 0;
   };
 
   const getStatusBadge = (status: string) => {
@@ -238,7 +266,7 @@ export default function MyListingsPage() {
                   </div>
 
                   {/* Actions */}
-                  <div className="flex items-center gap-2 mt-3">
+                  <div className="flex items-center gap-2 mt-3 flex-wrap">
                     <Link
                       href={`/plate/${listing.slug}`}
                       className="px-3 py-1.5 text-sm font-medium text-[var(--text-secondary)] bg-[var(--background-subtle)] rounded-lg hover:bg-[var(--border)] transition-colors"
@@ -251,6 +279,19 @@ export default function MyListingsPage() {
                     >
                       Edit
                     </Link>
+                    {/* Bump button for Boost Pro listings */}
+                    {canBump(listing) && (
+                      <button
+                        onClick={() => handleBump(listing.id)}
+                        disabled={bumpingId === listing.id}
+                        className="px-3 py-1.5 text-sm font-medium text-[var(--gold)] bg-[var(--gold)]/10 rounded-lg hover:bg-[var(--gold)]/20 transition-colors disabled:opacity-50 flex items-center gap-1"
+                      >
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 10l7-7m0 0l7 7m-7-7v18" />
+                        </svg>
+                        {bumpingId === listing.id ? 'Bumping...' : `Bump (${listing.bumpsRemaining} left)`}
+                      </button>
+                    )}
                     {listing.status === 'active' && (
                       <button
                         onClick={() => handleStatusChange(listing.id, 'draft')}
