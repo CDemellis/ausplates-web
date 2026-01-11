@@ -969,6 +969,8 @@ export interface UserListing {
   isFeatured: boolean;
   boostExpiresAt?: string;
   hasPaid: boolean;
+  bumpsRemaining: number;
+  bumpedAt?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -1008,6 +1010,8 @@ export async function getUserListings(
     isFeatured: listing.is_featured,
     boostExpiresAt: listing.boost_expires_at,
     hasPaid: listing.has_paid || false,
+    bumpsRemaining: listing.bumps_remaining || 0,
+    bumpedAt: listing.bumped_at,
     createdAt: listing.created_at,
     updatedAt: listing.updated_at,
   }));
@@ -1097,6 +1101,221 @@ export async function deleteListing(
   }
 
   return { success: true };
+}
+
+// Bump a listing to top (Boost Pro feature)
+export async function bumpListing(
+  accessToken: string,
+  listingId: string
+): Promise<{ success: boolean; bumpsRemaining: number; bumpedAt: string }> {
+  const url = `${API_BASE_URL}/api/listings/${listingId}/bump`;
+
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+  });
+
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    const errorMessage = typeof errorData.error === 'string' ? errorData.error : errorData.error?.message || errorData.message;
+    throw new Error(errorMessage || 'Failed to bump listing');
+  }
+
+  const data = await res.json();
+  return {
+    success: data.success,
+    bumpsRemaining: data.bumps_remaining,
+    bumpedAt: data.bumped_at,
+  };
+}
+
+// ============================================
+// NOTIFICATIONS API
+// ============================================
+
+export type NotificationType = 'price_drop' | 'new_message' | 'listing_sold' | 'boost_expiring' | 'system';
+
+export interface NotificationListing {
+  id: string;
+  combination: string;
+  state: AustralianState;
+  slug: string;
+  price: number;
+  colorScheme?: PlateColorScheme;
+}
+
+export interface NotificationMetadata {
+  oldPrice?: number;
+  newPrice?: number;
+  dropPercent?: number;
+  dropAmount?: number;
+}
+
+export interface AppNotification {
+  id: string;
+  userId: string;
+  type: NotificationType;
+  title: string;
+  body?: string;
+  listingId?: string;
+  conversationId?: string;
+  metadata?: NotificationMetadata;
+  isRead: boolean;
+  readAt?: string;
+  createdAt: string;
+  listing?: NotificationListing;
+}
+
+// API response types (snake_case from backend)
+interface APINotification {
+  id: string;
+  user_id: string;
+  type: string;
+  title: string;
+  body?: string;
+  listing_id?: string;
+  conversation_id?: string;
+  metadata?: {
+    old_price?: number;
+    new_price?: number;
+    drop_percent?: number;
+    drop_amount?: number;
+  };
+  is_read: boolean;
+  read_at?: string;
+  created_at: string;
+  listing?: {
+    id: string;
+    combination: string;
+    state: AustralianState;
+    slug: string;
+    price: number;
+    color_scheme?: PlateColorScheme;
+  };
+}
+
+function transformNotification(api: APINotification): AppNotification {
+  return {
+    id: api.id,
+    userId: api.user_id,
+    type: api.type as NotificationType,
+    title: api.title,
+    body: api.body,
+    listingId: api.listing_id,
+    conversationId: api.conversation_id,
+    metadata: api.metadata ? {
+      oldPrice: api.metadata.old_price,
+      newPrice: api.metadata.new_price,
+      dropPercent: api.metadata.drop_percent,
+      dropAmount: api.metadata.drop_amount,
+    } : undefined,
+    isRead: api.is_read,
+    readAt: api.read_at,
+    createdAt: api.created_at,
+    listing: api.listing ? {
+      id: api.listing.id,
+      combination: api.listing.combination,
+      state: api.listing.state,
+      slug: api.listing.slug,
+      price: api.listing.price,
+      colorScheme: api.listing.color_scheme,
+    } : undefined,
+  };
+}
+
+// Get notifications for authenticated user
+export async function getNotifications(
+  accessToken: string,
+  options: { limit?: number; offset?: number; unreadOnly?: boolean } = {}
+): Promise<{ notifications: AppNotification[]; count: number; hasMore: boolean }> {
+  const params = new URLSearchParams();
+  if (options.limit) params.set('limit', options.limit.toString());
+  if (options.offset) params.set('offset', options.offset.toString());
+  if (options.unreadOnly) params.set('unread', 'true');
+
+  const url = `${API_BASE_URL}/api/notifications?${params.toString()}`;
+
+  const res = await fetch(url, {
+    headers: {
+      'Authorization': `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+  });
+
+  if (!res.ok) {
+    throw new Error('Failed to fetch notifications');
+  }
+
+  const data: { data: APINotification[]; count: number; has_more: boolean } = await res.json();
+  return {
+    notifications: (data.data || []).map(transformNotification),
+    count: data.count || 0,
+    hasMore: data.has_more || false,
+  };
+}
+
+// Get unread notification count
+export async function getUnreadNotificationCount(accessToken: string): Promise<number> {
+  const url = `${API_BASE_URL}/api/notifications/unread-count`;
+
+  const res = await fetch(url, {
+    headers: {
+      'Authorization': `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+  });
+
+  if (!res.ok) {
+    return 0; // Fail silently for unread count
+  }
+
+  const data: { count: number } = await res.json();
+  return data.count || 0;
+}
+
+// Mark a notification as read
+export async function markNotificationRead(accessToken: string, notificationId: string): Promise<void> {
+  const url = `${API_BASE_URL}/api/notifications/${notificationId}/read`;
+
+  await fetch(url, {
+    method: 'PATCH',
+    headers: {
+      'Authorization': `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+  });
+  // Ignore errors for marking read - not critical
+}
+
+// Mark all notifications as read
+export async function markAllNotificationsRead(accessToken: string): Promise<void> {
+  const url = `${API_BASE_URL}/api/notifications/mark-all-read`;
+
+  await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+  });
+  // Ignore errors - not critical
+}
+
+// Delete a notification
+export async function deleteNotification(accessToken: string, notificationId: string): Promise<void> {
+  const url = `${API_BASE_URL}/api/notifications/${notificationId}`;
+
+  await fetch(url, {
+    method: 'DELETE',
+    headers: {
+      'Authorization': `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+  });
+  // Ignore errors - not critical
 }
 
 // Upload a photo to Supabase Storage
