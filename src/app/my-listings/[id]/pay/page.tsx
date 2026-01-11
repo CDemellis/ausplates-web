@@ -91,11 +91,23 @@ function PaymentForm({
       }
 
       if (paymentIntent && paymentIntent.status === 'succeeded') {
+        // Confirm payment with backend to publish listing
         const token = await getAccessToken();
-        if (token) {
-          await confirmPayment(token, paymentIntentId);
+        if (!token) {
+          onError('Session expired. Please refresh and try again.');
+          setIsProcessing(false);
+          return;
         }
-        onSuccess();
+
+        try {
+          await confirmPayment(token, paymentIntentId);
+          onSuccess();
+        } catch (confirmErr) {
+          // Payment succeeded but confirm failed - this is bad state
+          // The webhook should handle it, but warn user
+          console.error('Confirm failed after payment:', confirmErr);
+          onError('Payment received but publishing failed. Please contact support or check My Listings in a few minutes.');
+        }
       }
     } catch (err) {
       onError(err instanceof Error ? err.message : 'Payment failed');
