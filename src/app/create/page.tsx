@@ -1048,6 +1048,10 @@ function Step3Pay({
   paymentAmount,
   onPaymentSuccess,
   onPaymentError,
+  isValidatingPromo,
+  promoValidation,
+  onApplyPromo,
+  setPromoValidation,
 }: {
   draft: ListingDraft;
   onChange: (updates: Partial<ListingDraft>) => void;
@@ -1060,6 +1064,10 @@ function Step3Pay({
   paymentAmount: number;
   onPaymentSuccess: () => void;
   onPaymentError: (error: string) => void;
+  isValidatingPromo: boolean;
+  promoValidation: { valid: boolean; message: string } | null;
+  onApplyPromo: () => void;
+  setPromoValidation: (v: { valid: boolean; message: string } | null) => void;
 }) {
   const borderClass = draft.boostType === '30day'
     ? 'border-[var(--gold)] shadow-lg shadow-amber-100'
@@ -1176,13 +1184,32 @@ function Step3Pay({
             <label className="block text-sm font-medium text-[var(--text)] mb-2">
               Promo Code
             </label>
-            <input
-              type="text"
-              value={draft.promoCode}
-              onChange={(e) => onChange({ promoCode: e.target.value.toUpperCase() })}
-              placeholder="Enter code"
-              className="w-full px-4 py-3 border border-[var(--border)] rounded-xl focus:outline-none focus:ring-2 focus:ring-[var(--green)] focus:border-transparent uppercase"
-            />
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={draft.promoCode}
+                onChange={(e) => {
+                  onChange({ promoCode: e.target.value.toUpperCase() });
+                  // Clear validation when code changes
+                  if (promoValidation) setPromoValidation(null);
+                }}
+                placeholder="Enter code"
+                className="flex-1 px-4 py-3 border border-[var(--border)] rounded-xl focus:outline-none focus:ring-2 focus:ring-[var(--green)] focus:border-transparent uppercase"
+              />
+              <button
+                type="button"
+                onClick={onApplyPromo}
+                disabled={!draft.promoCode || isValidatingPromo}
+                className="px-4 py-3 bg-[var(--green)] text-white font-medium rounded-xl hover:bg-[#006B31] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                {isValidatingPromo ? '...' : 'Apply'}
+              </button>
+            </div>
+            {promoValidation && (
+              <p className={`mt-2 text-sm ${promoValidation.valid ? 'text-[var(--green)]' : 'text-[var(--error)]'}`}>
+                {promoValidation.message}
+              </p>
+            )}
           </div>
 
           {/* Total */}
@@ -1264,6 +1291,10 @@ function CreateListingContent() {
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [paymentIntentId, setPaymentIntentId] = useState<string | null>(null);
   const [paymentAmount, setPaymentAmount] = useState(0);
+
+  // Promo validation state
+  const [isValidatingPromo, setIsValidatingPromo] = useState(false);
+  const [promoValidation, setPromoValidation] = useState<{ valid: boolean; message: string } | null>(null);
 
   // Check URL for fresh=true to clear draft, or load from localStorage
   useEffect(() => {
@@ -1453,6 +1484,34 @@ function CreateListingContent() {
     setSubmitError(error);
   };
 
+  // Validate promo code
+  const handleApplyPromo = async () => {
+    if (!draft.promoCode) return;
+
+    setIsValidatingPromo(true);
+    setPromoValidation(null);
+
+    try {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/promo/validate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: draft.promoCode }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.valid) {
+        setPromoValidation({ valid: true, message: 'Promo code applied! Your listing is free.' });
+      } else {
+        setPromoValidation({ valid: false, message: data.error || 'Invalid promo code' });
+      }
+    } catch {
+      setPromoValidation({ valid: false, message: 'Failed to validate promo code' });
+    } finally {
+      setIsValidatingPromo(false);
+    }
+  };
+
   // Loading state
   if (authLoading) {
     return (
@@ -1545,6 +1604,10 @@ function CreateListingContent() {
             paymentAmount={paymentAmount}
             onPaymentSuccess={handlePaymentSuccess}
             onPaymentError={handlePaymentError}
+            isValidatingPromo={isValidatingPromo}
+            promoValidation={promoValidation}
+            onApplyPromo={handleApplyPromo}
+            setPromoValidation={setPromoValidation}
           />
         )}
       </main>
