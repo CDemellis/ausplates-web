@@ -5,26 +5,33 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/lib/auth-context';
 import { deleteListing, updateListing } from '@/lib/api';
+import { revalidateAfterStatusChange } from '@/app/actions';
 
 interface OwnerActionsProps {
   listingId: string;
+  slug: string;
   sellerId: string;
   status: string;
   hasPaid?: boolean;
 }
 
-export function OwnerActions({ listingId, sellerId, status, hasPaid = false }: OwnerActionsProps) {
+export function OwnerActions({ listingId, slug, sellerId, status: initialStatus, hasPaid = false }: OwnerActionsProps) {
   const router = useRouter();
   const { user, isAuthenticated, getAccessToken } = useAuth();
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Track local status for optimistic updates (avoids cache delays)
+  const [localStatus, setLocalStatus] = useState(initialStatus);
 
   // Only show if user is authenticated and owns this listing
   if (!isAuthenticated || !user || user.id !== sellerId) {
     return null;
   }
+
+  // Use local status for display
+  const status = localStatus;
 
   const handleDelete = async () => {
     setIsDeleting(true);
@@ -63,6 +70,13 @@ export function OwnerActions({ listingId, sellerId, status, hasPaid = false }: O
         throw new Error(`Failed to ${newStatus === 'draft' ? 'unpublish' : 'publish'} listing. Please try again.`);
       }
 
+      // Optimistically update local status for immediate UI feedback
+      setLocalStatus(newStatus);
+
+      // Revalidate all cached pages that show this listing
+      await revalidateAfterStatusChange(slug);
+
+      // Refresh current page data
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to update listing');

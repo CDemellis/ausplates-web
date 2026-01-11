@@ -246,6 +246,7 @@ export default async function ListingDetailPage({ params, searchParams }: PagePr
               {listing.seller?.id && (
                 <OwnerActions
                   listingId={listing.id}
+                  slug={listing.slug}
                   sellerId={listing.seller.id}
                   status={listing.status}
                   hasPaid={listing.hasPaid}
