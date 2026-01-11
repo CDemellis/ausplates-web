@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { useAuth } from '@/lib/auth-context';
-import { createBoostCheckout, confirmBoostPayment } from '@/lib/api';
+import { createBoostCheckout, confirmBoostPayment, validatePromoCode } from '@/lib/api';
 import { PlateView } from '@/components/PlateView';
 
 interface PageProps {
@@ -174,6 +174,15 @@ export default function BoostListingPage({ params }: PageProps) {
   const [paymentAmount, setPaymentAmount] = useState(0);
   const [paymentError, setPaymentError] = useState<string | null>(null);
 
+  // Promo code state
+  const [promoCode, setPromoCode] = useState('');
+  const [isValidatingPromo, setIsValidatingPromo] = useState(false);
+  const [promoValidation, setPromoValidation] = useState<{
+    valid: boolean;
+    type?: string;
+    message: string;
+  } | null>(null);
+
   // Redirect if not authenticated
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -237,6 +246,30 @@ export default function BoostListingPage({ params }: PageProps) {
     fetchListing();
   }, [isAuthenticated, id, getAccessToken, user?.id]);
 
+  const handleApplyPromo = async () => {
+    if (!promoCode.trim()) return;
+
+    setIsValidatingPromo(true);
+    setPromoValidation(null);
+    setPaymentError(null);
+
+    try {
+      const result = await validatePromoCode(promoCode);
+      setPromoValidation({
+        valid: result.valid,
+        type: result.type,
+        message: result.message,
+      });
+    } catch (err) {
+      setPromoValidation({
+        valid: false,
+        message: err instanceof Error ? err.message : 'Failed to validate code',
+      });
+    } finally {
+      setIsValidatingPromo(false);
+    }
+  };
+
   const handlePay = async () => {
     if (!listing) return;
 
@@ -247,7 +280,18 @@ export default function BoostListingPage({ params }: PageProps) {
       const token = await getAccessToken();
       if (!token) throw new Error('Not authenticated');
 
-      const result = await createBoostCheckout(token, listing.id, boostType);
+      const result = await createBoostCheckout(
+        token,
+        listing.id,
+        boostType,
+        promoCode || undefined
+      );
+
+      // If free (promo code covered the boost), redirect to my listings
+      if (result.free && result.listingSlug) {
+        router.push(`/my-listings?boosted=true`);
+        return;
+      }
 
       if (result.clientSecret && result.paymentIntentId) {
         setClientSecret(result.clientSecret);
@@ -262,6 +306,11 @@ export default function BoostListingPage({ params }: PageProps) {
       setIsCreatingPayment(false);
     }
   };
+
+  // Calculate display price (0 if valid free promo)
+  const displayPrice = promoValidation?.valid && (promoValidation.type === 'free_listing' || promoValidation.type === 'free_boost')
+    ? 0
+    : BOOST_PRICES[boostType];
 
   const handlePaymentSuccess = () => {
     router.push(`/my-listings?boosted=true`);
@@ -515,6 +564,82 @@ export default function BoostListingPage({ params }: PageProps) {
           </div>
         </div>
 
+        {/* Promo Code */}
+        <div className="mb-6 bg-white rounded-2xl border border-[var(--border)] p-6">
+          <label className="block text-sm font-medium text-[var(--text)] mb-2">
+            Promo Code
+          </label>
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={promoCode}
+              onChange={(e) => {
+                setPromoCode(e.target.value.toUpperCase());
+                if (promoValidation) setPromoValidation(null);
+              }}
+              placeholder="Enter code"
+              disabled={promoValidation?.valid}
+              className="flex-1 px-4 py-3 border border-[var(--border)] rounded-xl focus:outline-none focus:ring-2 focus:ring-[var(--green)] focus:border-transparent uppercase disabled:bg-[var(--background-subtle)] disabled:text-[var(--text-secondary)]"
+            />
+            {promoValidation?.valid ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setPromoCode('');
+                  setPromoValidation(null);
+                }}
+                className="px-4 py-3 text-[var(--text-secondary)] border border-[var(--border)] rounded-xl hover:bg-[var(--background-subtle)] transition-colors"
+              >
+                Clear
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={handleApplyPromo}
+                disabled={!promoCode.trim() || isValidatingPromo}
+                className="px-6 py-3 bg-[var(--green)] text-white font-medium rounded-xl hover:bg-[#006B31] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                {isValidatingPromo ? 'Checking...' : 'Apply'}
+              </button>
+            )}
+          </div>
+
+          {/* Promo validation message */}
+          {promoValidation && (
+            <div className={`mt-2 p-3 rounded-lg ${
+              promoValidation.valid
+                ? 'bg-green-50 border border-green-200'
+                : 'bg-red-50 border border-red-200'
+            }`}>
+              <p className={`text-sm ${promoValidation.valid ? 'text-green-700' : 'text-red-600'}`}>
+                {promoValidation.message}
+              </p>
+            </div>
+          )}
+
+          {/* Total */}
+          <div className="flex justify-between items-center pt-4 mt-4 border-t border-[var(--border)]">
+            <div>
+              <span className="text-[var(--text)] font-medium">Total</span>
+              {promoValidation?.valid && (
+                <p className="text-xs text-[var(--green)] font-medium">Free with promo code!</p>
+              )}
+            </div>
+            <div className="text-right">
+              {promoValidation?.valid && (
+                <span className="text-lg text-[var(--text-muted)] line-through mr-2">
+                  ${(BOOST_PRICES[boostType] / 100).toFixed(2)}
+                </span>
+              )}
+              <span className={`text-2xl font-bold ${
+                displayPrice === 0 ? 'text-[var(--green)]' : 'text-[var(--text)]'
+              }`}>
+                ${(displayPrice / 100).toFixed(2)}
+              </span>
+            </div>
+          </div>
+        </div>
+
         {paymentError && (
           <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl">
             <p className="text-sm text-[var(--error)]">{paymentError}</p>
@@ -530,20 +655,29 @@ export default function BoostListingPage({ params }: PageProps) {
           {isCreatingPayment ? (
             <>
               <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-              Preparing payment...
+              {displayPrice === 0 ? 'Activating boost...' : 'Preparing payment...'}
+            </>
+          ) : displayPrice === 0 ? (
+            <>
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+              Activate Free Boost
             </>
           ) : (
             <>
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
               </svg>
-              Boost for ${(BOOST_PRICES[boostType] / 100).toFixed(2)}
+              Boost for ${(displayPrice / 100).toFixed(2)}
             </>
           )}
         </button>
 
         <p className="mt-4 text-xs text-center text-[var(--text-muted)]">
-          Secure payment powered by Stripe. Your boost will be activated immediately.
+          {displayPrice === 0
+            ? 'Your boost will be activated immediately.'
+            : 'Secure payment powered by Stripe. Your boost will be activated immediately.'}
         </p>
       </div>
     </div>

@@ -788,7 +788,8 @@ export async function confirmPayment(
 export async function createBoostCheckout(
   accessToken: string,
   listingId: string,
-  boostType: '7day' | '30day'
+  boostType: '7day' | '30day',
+  promoCode?: string
 ): Promise<CheckoutResponse> {
   const url = `${API_BASE_URL}/api/payments/create-boost-checkout`;
 
@@ -801,6 +802,7 @@ export async function createBoostCheckout(
     body: JSON.stringify({
       listing_id: listingId,
       boost_type: boostType,
+      promo_code: promoCode || undefined,
     }),
   });
 
