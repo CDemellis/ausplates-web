@@ -70,7 +70,7 @@ export default function MyListingsPage() {
     }
   };
 
-  const handleStatusChange = async (listingId: string, newStatus: 'active' | 'draft') => {
+  const handleStatusChange = async (listingId: string, newStatus: 'active' | 'draft' | 'sold') => {
     // For publishing drafts, check if payment is required
     const listing = listings.find(l => l.id === listingId);
     if (listing?.status === 'draft' && newStatus === 'active' && !listing.hasPaid) {
@@ -91,6 +91,8 @@ export default function MyListingsPage() {
       setError(err instanceof Error ? err.message : 'Failed to update listing');
     }
   };
+
+  const [showSoldModal, setShowSoldModal] = useState<string | null>(null);
 
   const handleBump = async (listingId: string) => {
     setBumpingId(listingId);
@@ -313,12 +315,23 @@ export default function MyListingsPage() {
                       </button>
                     )}
                     {listing.status === 'active' && (
-                      <button
-                        onClick={() => handleStatusChange(listing.id, 'draft')}
-                        className="px-3 py-1.5 text-sm font-medium text-[var(--text-secondary)] bg-[var(--background-subtle)] rounded-lg hover:bg-[var(--border)] transition-colors"
-                      >
-                        Unpublish
-                      </button>
+                      <>
+                        <button
+                          onClick={() => setShowSoldModal(listing.id)}
+                          className="px-3 py-1.5 text-sm font-medium text-[var(--green)] bg-[var(--green)]/10 rounded-lg hover:bg-[var(--green)]/20 transition-colors flex items-center gap-1"
+                        >
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          </svg>
+                          Mark as Sold
+                        </button>
+                        <button
+                          onClick={() => handleStatusChange(listing.id, 'draft')}
+                          className="px-3 py-1.5 text-sm font-medium text-[var(--text-secondary)] bg-[var(--background-subtle)] rounded-lg hover:bg-[var(--border)] transition-colors"
+                        >
+                          Unpublish
+                        </button>
+                      </>
                     )}
                     {listing.status === 'draft' && (
                       <button
@@ -364,6 +377,41 @@ export default function MyListingsPage() {
                 className="flex-1 px-4 py-2 bg-red-600 text-white font-medium rounded-xl hover:bg-red-700 disabled:opacity-50 transition-colors"
               >
                 {deletingId === showDeleteModal ? 'Deleting...' : 'Delete'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Mark as Sold Confirmation Modal */}
+      {showSoldModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setShowSoldModal(null)} />
+          <div className="relative bg-white rounded-2xl p-6 max-w-sm w-full shadow-xl">
+            <div className="w-12 h-12 bg-[var(--green)]/10 rounded-full flex items-center justify-center mx-auto mb-4">
+              <svg className="w-6 h-6 text-[var(--green)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+            </div>
+            <h3 className="text-lg font-semibold text-[var(--text)] mb-2 text-center">Mark as Sold?</h3>
+            <p className="text-[var(--text-secondary)] mb-6 text-center">
+              This will remove the listing from search results and mark it as sold.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowSoldModal(null)}
+                className="flex-1 px-4 py-2 text-[var(--text)] font-medium border border-[var(--border)] rounded-xl hover:bg-[var(--background-subtle)] transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  handleStatusChange(showSoldModal, 'sold');
+                  setShowSoldModal(null);
+                }}
+                className="flex-1 px-4 py-2 bg-[var(--green)] text-white font-medium rounded-xl hover:bg-[#006B31] transition-colors"
+              >
+                Mark as Sold
               </button>
             </div>
           </div>
