@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
@@ -17,16 +17,27 @@ export function MessagesIcon({ showLabel = false, className = '' }: MessagesIcon
   const { isAuthenticated, getAccessToken } = useAuth();
   const pathname = usePathname();
   const [unreadCount, setUnreadCount] = useState(0);
+  const isFetchingRef = useRef(false);
+  const hasFetchedRef = useRef(false);
 
   // Check if we're on the messages page (poll less frequently there)
   const isOnMessagesPage = pathname?.startsWith('/messages');
 
-  // Fetch unread count
-  const fetchUnreadCount = useCallback(async () => {
+  // Fetch unread count with deduplication guard
+  const fetchUnreadCount = useCallback(async (isPolling = false) => {
     if (!isAuthenticated) {
       setUnreadCount(0);
       return;
     }
+
+    // Prevent duplicate concurrent requests
+    if (isFetchingRef.current) return;
+
+    // For initial fetch, prevent duplicate calls from re-renders
+    if (!isPolling && hasFetchedRef.current) return;
+
+    isFetchingRef.current = true;
+    hasFetchedRef.current = true;
 
     try {
       const token = await getAccessToken();
@@ -37,6 +48,8 @@ export function MessagesIcon({ showLabel = false, className = '' }: MessagesIcon
     } catch (error) {
       // Fail silently - unread count is not critical
       console.error('Failed to fetch unread count:', error);
+    } finally {
+      isFetchingRef.current = false;
     }
   }, [isAuthenticated, getAccessToken]);
 
@@ -44,15 +57,16 @@ export function MessagesIcon({ showLabel = false, className = '' }: MessagesIcon
   useEffect(() => {
     if (!isAuthenticated) {
       setUnreadCount(0);
+      hasFetchedRef.current = false;
       return;
     }
 
-    // Fetch immediately
-    fetchUnreadCount();
+    // Fetch immediately (initial fetch)
+    fetchUnreadCount(false);
 
     // Poll every 30 seconds (or 10 seconds if on messages page)
     const interval = setInterval(
-      fetchUnreadCount,
+      () => fetchUnreadCount(true),
       isOnMessagesPage ? 10000 : 30000
     );
 
