@@ -1471,9 +1471,9 @@ function CreateListingContent() {
       );
 
       // If free (promo code covered full amount), redirect to listing
-      if (checkoutResult.free && checkoutResult.listing_slug) {
+      if (checkoutResult.free && checkoutResult.listingSlug) {
         localStorage.removeItem(STORAGE_KEY);
-        router.push(`/plate/${checkoutResult.listing_slug}?created=true`);
+        router.push(`/plate/${checkoutResult.listingSlug}?created=true`);
         return;
       }
 
