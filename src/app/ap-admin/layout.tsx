@@ -31,7 +31,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     if (!user) {
       // Use window.location for cross-domain redirect
       if (typeof window !== 'undefined') {
-        window.location.href = 'https://ausplates.app/signin?redirect=admin';
+        window.location.href = 'https://ausplates.app/signin?redirect=' + encodeURIComponent('https://admin.ausplates.app/');
       }
       return;
     }
@@ -49,7 +49,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       const token = await getAccessToken();
       if (!token) {
         if (typeof window !== 'undefined') {
-          window.location.href = 'https://ausplates.app/signin?redirect=admin';
+          window.location.href = 'https://ausplates.app/signin?redirect=' + encodeURIComponent('https://admin.ausplates.app/');
         }
         return;
       }

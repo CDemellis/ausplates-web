@@ -76,10 +76,19 @@ function SignInForm() {
 
   const redirect = searchParams.get('redirect') || '/';
 
+  // Helper to handle redirect (supports both relative paths and full URLs)
+  const doRedirect = (url: string) => {
+    if (url.startsWith('http://') || url.startsWith('https://')) {
+      window.location.href = url;
+    } else {
+      router.push(url);
+    }
+  };
+
   // Redirect if already authenticated
   useEffect(() => {
     if (!authLoading && isAuthenticated) {
-      router.push(redirect);
+      doRedirect(redirect);
     }
   }, [authLoading, isAuthenticated, redirect, router]);
 
@@ -91,7 +100,7 @@ function SignInForm() {
 
     try {
       await signIn(email, password);
-      router.push(redirect);
+      doRedirect(redirect);
     } catch (err) {
       const error = err as Error & { code?: string };
       setError(error.message);
