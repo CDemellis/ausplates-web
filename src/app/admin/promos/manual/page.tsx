@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/lib/auth-context';
@@ -8,7 +8,7 @@ import { getPromoCodes, PromoCode, updatePromoCode } from '@/lib/api';
 
 const ADMIN_EMAIL = 'hello@ausplates.app';
 
-export default function ManualCodesPage() {
+function ManualCodesContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user, isLoading: authLoading, getAccessToken } = useAuth();
@@ -260,5 +260,17 @@ export default function ManualCodesPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function ManualCodesPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-[#F8F8F8] flex items-center justify-center">
+        <div className="text-[#666666]">Loading...</div>
+      </div>
+    }>
+      <ManualCodesContent />
+    </Suspense>
   );
 }
