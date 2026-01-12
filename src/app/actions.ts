@@ -14,6 +14,6 @@ export async function revalidateAfterStatusChange(slug: string) {
   // Revalidate all pages that show listings
   revalidatePath(`/plate/${slug}`);
   revalidatePath('/my-listings');
-  revalidatePath('/browse');
+  revalidatePath('/plates');
   revalidatePath('/');
 }

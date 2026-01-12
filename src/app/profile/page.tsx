@@ -130,7 +130,7 @@ function SavedPlatesSection() {
             </div>
             <p className="text-[var(--text-muted)]">No saved plates yet</p>
             <Link
-              href="/browse"
+              href="/plates"
               className="inline-block mt-4 text-sm font-medium text-[var(--green)] hover:underline"
             >
               Browse plates
