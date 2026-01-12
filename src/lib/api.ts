@@ -593,6 +593,26 @@ export async function markConversationRead(accessToken: string, conversationId: 
   // Ignore errors for marking read - not critical
 }
 
+// Delete conversation (soft delete - removes from user's view only)
+export async function deleteConversation(accessToken: string, conversationId: string): Promise<{ success: boolean }> {
+  const url = `${API_BASE_URL}/api/messages/conversations/${conversationId}`;
+
+  const res = await fetch(url, {
+    method: 'DELETE',
+    headers: {
+      'Authorization': `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+  });
+
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.error || 'Failed to delete conversation');
+  }
+
+  return res.json();
+}
+
 // ============================================
 // LISTING CREATION API
 // ============================================
