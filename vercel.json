@@ -1,18 +1,2 @@
 {
-  "rewrites": [
-    {
-      "source": "/:path*",
-      "has": [
-        {
-          "type": "host",
-          "value": "admin.ausplates.app"
-        }
-      ],
-      "destination": "/(admin)/:path*"
-    },
-    {
-      "source": "/admin/:path*",
-      "destination": "/not-found"
-    }
-  ]
 }
