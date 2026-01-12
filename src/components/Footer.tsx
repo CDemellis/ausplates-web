@@ -1,6 +1,13 @@
+'use client';
+
 import Link from 'next/link';
 
 export function Footer() {
+  // Hide on admin subdomain
+  if (typeof window !== 'undefined' && window.location.hostname.startsWith('admin.')) {
+    return null;
+  }
+
   return (
     <footer className="bg-[var(--background-subtle)] border-t border-[var(--border)]">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">

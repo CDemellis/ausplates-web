@@ -9,6 +9,11 @@ import { useAuth } from '@/lib/auth-context';
 
 export function Header() {
   const { user, isAuthenticated, isLoading } = useAuth();
+
+  // Hide on admin subdomain
+  if (typeof window !== 'undefined' && window.location.hostname.startsWith('admin.')) {
+    return null;
+  }
   return (
     <header className="sticky top-0 z-50 bg-white border-b border-[var(--border-subtle)]">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
