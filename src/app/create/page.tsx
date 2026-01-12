@@ -91,7 +91,7 @@ const INITIAL_DRAFT: ListingDraft = {
 };
 
 const STORAGE_KEY = 'ausplates_listing_draft';
-const DRAFT_EXPIRY_DAYS = 7;
+const DRAFT_EXPIRY_DAYS = 30;
 
 // ============================================
 // CONSTANTS
