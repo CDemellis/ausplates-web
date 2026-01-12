@@ -386,11 +386,14 @@ interface APIConversationListing {
 interface APIConversation {
   id: string;
   listing_id: string;
+  buyer_id: string;
+  seller_id: string;
   listing: APIConversationListing;
-  participants: APIConversationParticipant[];
+  buyer?: APIConversationParticipant;
+  seller?: APIConversationParticipant;
   other_user: APIConversationParticipant;
   last_message?: APIMessage;
-  unread_count: number;
+  unread_count?: number;
   created_at: string;
   updated_at: string;
   messages?: APIMessage[];
@@ -427,10 +430,14 @@ function transformConversation(api: APIConversation): Conversation {
       state: api.listing.state,
       price: api.listing.price,
     },
-    participants: api.participants.map(transformParticipant),
+    // API returns buyer/seller, not participants array
+    participants: [
+      api.buyer ? transformParticipant(api.buyer) : null,
+      api.seller ? transformParticipant(api.seller) : null,
+    ].filter(Boolean) as ConversationParticipant[],
     otherUser: transformParticipant(api.other_user),
     lastMessage: api.last_message ? transformMessage(api.last_message) : undefined,
-    unreadCount: api.unread_count,
+    unreadCount: api.unread_count ?? 0,
     createdAt: api.created_at,
     updatedAt: api.updated_at,
   };
