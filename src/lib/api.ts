@@ -534,15 +534,16 @@ export async function startConversation(accessToken: string, listingId: string, 
       'Authorization': `Bearer ${accessToken}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ listingId, message }),
+    body: JSON.stringify({ listing_id: listingId, message }),
   });
 
   if (!res.ok) {
     throw new Error('Failed to start conversation');
   }
 
-  const data: { data: APIConversation } = await res.json();
-  return transformConversation(data.data);
+  const data: { conversation_id: string; message: APIMessage } = await res.json();
+  // Return minimal conversation object with the ID for redirect
+  return { id: data.conversation_id } as Conversation;
 }
 
 // Get unread message count
