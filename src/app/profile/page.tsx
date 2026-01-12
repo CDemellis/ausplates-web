@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
-import { getTokens, getLinkingStatus, linkEmail, LinkingStatus, deleteAccount, clearTokens } from '@/lib/auth';
+import { getTokens, getLinkingStatus, linkEmail, LinkingStatus, deleteAccount, clearTokens, changePassword } from '@/lib/auth';
 import { getSavedListings, getUserProfile, updateUserProfile, uploadPhoto, UserProfile, UpdateProfileData } from '@/lib/api';
 import { Listing } from '@/types/listing';
 import { ListingCard, ListingCardSkeleton } from '@/components/ListingCard';
@@ -786,6 +786,182 @@ function AccountLinkingSection() {
   );
 }
 
+function ChangePasswordSection() {
+  const [showForm, setShowForm] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+
+  // Password validation
+  const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
+  const isValidPassword = passwordRegex.test(newPassword);
+  const passwordsMatch = newPassword === confirmPassword;
+
+  const canSubmit = currentPassword && newPassword && confirmPassword && isValidPassword && passwordsMatch && !isSubmitting;
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setSuccess('');
+
+    if (!isValidPassword) {
+      setError('Password must be at least 8 characters with uppercase, lowercase, and a number');
+      return;
+    }
+
+    if (!passwordsMatch) {
+      setError('Passwords do not match');
+      return;
+    }
+
+    const { accessToken } = getTokens();
+    if (!accessToken) return;
+
+    setIsSubmitting(true);
+    try {
+      await changePassword(accessToken, currentPassword, newPassword);
+      setSuccess('Password changed successfully');
+      setShowForm(false);
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleCancel = () => {
+    setShowForm(false);
+    setCurrentPassword('');
+    setNewPassword('');
+    setConfirmPassword('');
+    setError('');
+  };
+
+  return (
+    <div className="bg-white rounded-2xl border border-[var(--border)] overflow-hidden">
+      <div className="px-6 py-4 border-b border-[var(--border)]">
+        <h2 className="text-lg font-semibold text-[var(--text)]">Security</h2>
+        <p className="text-sm text-[var(--text-muted)] mt-1">
+          Manage your password and account security
+        </p>
+      </div>
+
+      <div className="p-6">
+        {error && (
+          <div className="bg-red-50 text-red-600 px-4 py-3 rounded-xl text-sm mb-4">
+            {error}
+          </div>
+        )}
+
+        {success && (
+          <div className="bg-green-50 text-green-600 px-4 py-3 rounded-xl text-sm flex items-center gap-2 mb-4">
+            <CheckIcon />
+            {success}
+          </div>
+        )}
+
+        {!showForm ? (
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="font-medium text-[var(--text)]">Password</h3>
+              <p className="text-sm text-[var(--text-muted)] mt-1">
+                Change your account password
+              </p>
+            </div>
+            <button
+              onClick={() => setShowForm(true)}
+              className="text-sm font-medium text-[var(--green)] hover:underline"
+            >
+              Change password
+            </button>
+          </div>
+        ) : (
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label htmlFor="current-password" className="block text-sm font-medium text-[var(--text)] mb-1">
+                Current Password
+              </label>
+              <input
+                type="password"
+                id="current-password"
+                value={currentPassword}
+                onChange={(e) => setCurrentPassword(e.target.value)}
+                required
+                className="w-full px-4 py-3 rounded-xl border border-[var(--border)] focus:outline-none focus:ring-2 focus:ring-[var(--green)] focus:border-transparent"
+                placeholder="Enter current password"
+              />
+            </div>
+
+            <div>
+              <label htmlFor="new-password" className="block text-sm font-medium text-[var(--text)] mb-1">
+                New Password
+              </label>
+              <input
+                type="password"
+                id="new-password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                required
+                minLength={8}
+                className="w-full px-4 py-3 rounded-xl border border-[var(--border)] focus:outline-none focus:ring-2 focus:ring-[var(--green)] focus:border-transparent"
+                placeholder="At least 8 characters"
+              />
+              {newPassword && !isValidPassword && (
+                <p className="text-sm text-red-600 mt-1">
+                  Password must be at least 8 characters with uppercase, lowercase, and a number
+                </p>
+              )}
+            </div>
+
+            <div>
+              <label htmlFor="confirm-password" className="block text-sm font-medium text-[var(--text)] mb-1">
+                Confirm New Password
+              </label>
+              <input
+                type="password"
+                id="confirm-password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                required
+                className="w-full px-4 py-3 rounded-xl border border-[var(--border)] focus:outline-none focus:ring-2 focus:ring-[var(--green)] focus:border-transparent"
+                placeholder="Confirm new password"
+              />
+              {confirmPassword && !passwordsMatch && (
+                <p className="text-sm text-red-600 mt-1">
+                  Passwords do not match
+                </p>
+              )}
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={handleCancel}
+                className="flex-1 py-3 px-4 rounded-xl border border-[var(--border)] font-medium text-[var(--text)] hover:bg-gray-100 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={!canSubmit}
+                className="flex-1 py-3 px-4 rounded-xl bg-[var(--green)] text-white font-medium hover:bg-[#006B31] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isSubmitting ? 'Changing...' : 'Change Password'}
+              </button>
+            </div>
+          </form>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function DeleteAccountSection({ onDelete }: { onDelete: () => void }) {
   const [showConfirm, setShowConfirm] = useState(false);
   const [confirmText, setConfirmText] = useState('');
@@ -965,6 +1141,9 @@ export default function ProfilePage() {
 
         {/* Account Linking */}
         <AccountLinkingSection />
+
+        {/* Change Password */}
+        <ChangePasswordSection />
 
         {/* Sign Out */}
         <div className="bg-white rounded-2xl border border-[var(--border)] p-6">

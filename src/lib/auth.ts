@@ -348,3 +348,23 @@ export async function deleteAccount(accessToken: string): Promise<{ success: boo
 
   return data;
 }
+
+// Change password
+export async function changePassword(accessToken: string, currentPassword: string, newPassword: string): Promise<{ message: string }> {
+  const res = await fetch(`${API_BASE_URL}/api/auth/change-password`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ currentPassword, newPassword }),
+  });
+
+  const data = await res.json();
+
+  if (!res.ok) {
+    throw new Error(data.error || 'Failed to change password');
+  }
+
+  return data;
+}
