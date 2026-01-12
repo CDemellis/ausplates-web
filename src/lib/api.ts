@@ -477,8 +477,8 @@ export async function getConversation(accessToken: string, conversationId: strin
     throw new Error('Failed to fetch conversation');
   }
 
-  const data: { data: APIConversation } = await res.json();
-  return transformConversationDetail(data.data);
+  const data: APIConversation = await res.json();
+  return transformConversationDetail(data);
 }
 
 // Get messages for a conversation (for polling new messages)
