@@ -254,6 +254,8 @@ export function clearTokens() {
     // Clear localStorage
     localStorage.removeItem(ACCESS_TOKEN_KEY);
     localStorage.removeItem(REFRESH_TOKEN_KEY);
+    // Clear admin 2FA session
+    localStorage.removeItem('admin_2fa_verified_at');
     // Clear cookies
     deleteCookie(ACCESS_TOKEN_KEY);
     deleteCookie(REFRESH_TOKEN_KEY);
