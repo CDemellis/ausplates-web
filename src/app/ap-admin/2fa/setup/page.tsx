@@ -26,7 +26,7 @@ export default function TwoFactorSetupPage() {
       const token = await getAccessToken();
       if (!token) {
         if (typeof window !== 'undefined') {
-          window.location.href = 'https://ausplates.app/signin?redirect=admin';
+          window.location.href = 'https://ausplates.app/signin?redirect=' + encodeURIComponent('https://admin.ausplates.app/2fa/setup');
         }
         return;
       }
