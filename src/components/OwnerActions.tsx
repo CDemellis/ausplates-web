@@ -13,9 +13,40 @@ interface OwnerActionsProps {
   sellerId: string;
   status: string;
   hasPaid?: boolean;
+  isFeatured?: boolean;
+  boostExpiresAt?: string;
+  bumpsRemaining?: number;
 }
 
-export function OwnerActions({ listingId, slug, sellerId, status: initialStatus, hasPaid = false }: OwnerActionsProps) {
+function formatBoostExpiry(expiresAt: string): { text: string; isExpiringSoon: boolean; isExpired: boolean } {
+  const expiry = new Date(expiresAt);
+  const now = new Date();
+  const diffMs = expiry.getTime() - now.getTime();
+
+  if (diffMs <= 0) {
+    return { text: 'Boost expired', isExpiringSoon: false, isExpired: true };
+  }
+
+  const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+  const diffDays = Math.floor(diffHours / 24);
+  const remainingHours = diffHours % 24;
+
+  const isExpiringSoon = diffHours < 24;
+
+  let text: string;
+  if (diffDays > 0) {
+    text = `${diffDays}d ${remainingHours}h remaining`;
+  } else if (diffHours > 0) {
+    text = `${diffHours}h remaining`;
+  } else {
+    const diffMinutes = Math.floor(diffMs / (1000 * 60));
+    text = `${diffMinutes}m remaining`;
+  }
+
+  return { text, isExpiringSoon, isExpired: false };
+}
+
+export function OwnerActions({ listingId, slug, sellerId, status: initialStatus, hasPaid = false, isFeatured = false, boostExpiresAt, bumpsRemaining = 0 }: OwnerActionsProps) {
   const router = useRouter();
   const { user, isAuthenticated, getAccessToken } = useAuth();
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -94,6 +125,45 @@ export function OwnerActions({ listingId, slug, sellerId, status: initialStatus,
           </svg>
           <h3 className="font-medium text-[var(--text)]">This is your listing</h3>
         </div>
+
+        {/* Boost Status Banner */}
+        {isFeatured && boostExpiresAt && (() => {
+          const { text, isExpiringSoon, isExpired } = formatBoostExpiry(boostExpiresAt);
+          if (isExpired) return null;
+          const is30DayBoost = bumpsRemaining > 0;
+          return (
+            <div className={`mb-4 p-3 rounded-xl border ${isExpiringSoon ? 'bg-orange-50 border-orange-200' : 'bg-[var(--gold)]/10 border-[var(--gold)]/30'}`}>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <svg className={`w-4 h-4 ${isExpiringSoon ? 'text-orange-600' : 'text-[var(--gold)]'}`} fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                  </svg>
+                  <span className={`text-sm font-medium ${isExpiringSoon ? 'text-orange-700' : 'text-[var(--text)]'}`}>
+                    {is30DayBoost ? 'Boost Pro' : 'Boost'} Active
+                  </span>
+                  <span className={`text-sm ${isExpiringSoon ? 'text-orange-600' : 'text-[var(--text-secondary)]'}`}>
+                    • {text}
+                  </span>
+                </div>
+                {isExpiringSoon && (
+                  <Link
+                    href={`/my-listings/${listingId}/boost`}
+                    className="text-sm font-medium text-orange-600 hover:text-orange-700"
+                  >
+                    Renew
+                  </Link>
+                )}
+              </div>
+              {is30DayBoost && (
+                <p className="text-xs text-[var(--text-muted)] mt-1 ml-6">
+                  {bumpsRemaining > 0
+                    ? `${bumpsRemaining} bump${bumpsRemaining !== 1 ? 's' : ''} remaining`
+                    : 'All bumps used'}
+                </p>
+              )}
+            </div>
+          );
+        })()}
 
         {error && (
           <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl">

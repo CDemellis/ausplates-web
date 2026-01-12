@@ -125,6 +125,8 @@ export interface ListingWithSeller extends Listing {
     soldCount: number;
   };
   hasPaid?: boolean;
+  boostExpiresAt?: string;
+  bumpsRemaining?: number;
 }
 
 export const STATE_NAMES: Record<AustralianState, string> = {

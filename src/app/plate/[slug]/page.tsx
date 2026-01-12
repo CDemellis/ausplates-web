@@ -14,6 +14,7 @@ import { SaveButton } from '@/components/SaveButton';
 import { ContactSellerButton } from '@/components/ContactSellerButton';
 import { OwnerActions } from '@/components/OwnerActions';
 import { PhotoGallery } from '@/components/PhotoGallery';
+import { ReportListingButton } from '@/components/ReportListingButton';
 
 interface PageProps {
   params: Promise<{ slug: string }>;
@@ -199,6 +200,11 @@ export default async function ListingDetailPage({ params, searchParams }: PagePr
                   </svg>
                   Listed {formatTimeAgo(listing.createdAt)}
                 </span>
+                <ReportListingButton
+                  listingId={listing.id}
+                  combination={listing.combination}
+                  sellerId={listing.seller?.id}
+                />
               </div>
             </div>
 
@@ -250,6 +256,9 @@ export default async function ListingDetailPage({ params, searchParams }: PagePr
                   sellerId={listing.seller.id}
                   status={listing.status}
                   hasPaid={listing.hasPaid}
+                  isFeatured={listing.isFeatured}
+                  boostExpiresAt={listing.boostExpiresAt}
+                  bumpsRemaining={listing.bumpsRemaining}
                 />
               )}
 

@@ -26,6 +26,9 @@ interface APIListing {
   updated_at: string;
   // Whether listing has been paid for (allows free republishing)
   has_paid?: boolean;
+  // Boost properties
+  boost_expires_at?: string;
+  bumps_remaining?: number;
   seller?: {
     id: string;
     full_name: string;
@@ -92,6 +95,8 @@ function transformListingWithSeller(api: APIListing): ListingWithSeller {
       soldCount: 0,
     },
     hasPaid: api.has_paid,
+    boostExpiresAt: api.boost_expires_at,
+    bumpsRemaining: api.bumps_remaining ?? 0,
   };
 }
 
@@ -1449,4 +1454,466 @@ export async function deletePhoto(
   }
 
   return { success: true };
+}
+
+// ============================================
+// REPORT LISTING API
+// ============================================
+
+export type ReportReason =
+  | 'inappropriate_content'
+  | 'suspected_fraud'
+  | 'incorrect_information'
+  | 'already_sold'
+  | 'other';
+
+export async function reportListing(
+  accessToken: string,
+  listingId: string,
+  reason: ReportReason,
+  details?: string
+): Promise<{ reported: boolean }> {
+  const url = `${API_BASE_URL}/api/listings/${listingId}/report`;
+
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      reason,
+      details: details?.trim() || undefined,
+    }),
+  });
+
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    const errorMessage = typeof errorData.error === 'string' ? errorData.error : errorData.error?.message || errorData.message;
+    throw new Error(errorMessage || 'Failed to report listing');
+  }
+
+  return res.json();
+}
+
+// ============================================================================
+// ADMIN - Promo Code Management
+// ============================================================================
+
+export interface PromoCode {
+  id: string;
+  code: string;
+  type: 'welcome' | 'sourced' | 'manual' | 'free_listing';
+  discountType: string;
+  discountValue: number;
+  appliesTo: string;
+  maxUses: number;
+  timesUsed: number;
+  redeemedBy: string | null;
+  redeemedAt: string | null;
+  listingId: string | null;
+  expiresAt: string | null;
+  source: string | null;
+  sourceUrl: string | null;
+  campaign: string | null;
+  status: 'active' | 'redeemed' | 'expired' | 'superseded';
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string | null;
+  users?: { email: string; fullName: string } | null;
+  redemptions?: { count: number }[];
+}
+
+export interface PromoStats {
+  totalCodes: number;
+  welcomeCodes: number;
+  sourcedCodes: number;
+  manualCodes: number;
+  totalRedemptions: number;
+  activeWelcomeCodes: number;
+  flaggedUsers: number;
+  pageViewsLast7Days: number;
+}
+
+export interface PromoRedemption {
+  id: string;
+  redeemedAt: string;
+  source: string | null;
+  promoCodes: { code: string; type: string };
+  users: { email: string; fullName: string };
+}
+
+export interface FlaggedAttempt {
+  id: string;
+  userId: string;
+  promoCodeId: string | null;
+  attemptCount: number;
+  lastError: string | null;
+  flaggedAt: string;
+  resolvedAt: string | null;
+  notes: string | null;
+  users: { email: string; fullName: string; createdAt: string };
+  promoCodes: { code: string; type: string } | null;
+}
+
+export interface SourceStats {
+  source: string;
+  campaign: string | null;
+  totalCodes: number;
+  totalUses: number;
+  maxPossibleUses: number;
+  activeCodes: number;
+  pageViews: number;
+  conversionRate: string;
+}
+
+// Transform snake_case API response to camelCase
+function transformPromoCode(api: Record<string, unknown>): PromoCode {
+  return {
+    id: api.id as string,
+    code: api.code as string,
+    type: api.type as PromoCode['type'],
+    discountType: (api.discount_type || 'percentage') as string,
+    discountValue: (api.discount_value || 100) as number,
+    appliesTo: (api.applies_to || 'basic_listing') as string,
+    maxUses: api.max_uses as number,
+    timesUsed: api.times_used as number,
+    redeemedBy: api.redeemed_by as string | null,
+    redeemedAt: api.redeemed_at as string | null,
+    listingId: api.listing_id as string | null,
+    expiresAt: api.expires_at as string | null,
+    source: api.source as string | null,
+    sourceUrl: api.source_url as string | null,
+    campaign: api.campaign as string | null,
+    status: (api.status || 'active') as PromoCode['status'],
+    isActive: api.is_active as boolean,
+    createdAt: api.created_at as string,
+    updatedAt: api.updated_at as string | null,
+    users: api.users as { email: string; fullName: string } | null,
+    redemptions: api.redemptions as { count: number }[] | undefined,
+  };
+}
+
+// Get promo dashboard stats
+export async function getPromoStats(accessToken: string): Promise<{
+  stats: PromoStats;
+  recentRedemptions: PromoRedemption[];
+}> {
+  const url = `${API_BASE_URL}/api/admin/promos/stats`;
+
+  const res = await fetch(url, {
+    headers: {
+      'Authorization': `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+  });
+
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.error || 'Failed to fetch promo stats');
+  }
+
+  const data = await res.json();
+  return {
+    stats: data.stats,
+    recentRedemptions: (data.recentRedemptions || []).map((r: Record<string, unknown>) => ({
+      id: r.id,
+      redeemedAt: r.redeemed_at,
+      source: r.source,
+      promoCodes: r.promo_codes,
+      users: r.users,
+    })),
+  };
+}
+
+// List promo codes with filters
+export async function getPromoCodes(
+  accessToken: string,
+  params?: {
+    type?: string;
+    status?: string;
+    campaign?: string;
+    source?: string;
+    search?: string;
+    page?: number;
+    limit?: number;
+  }
+): Promise<{
+  codes: PromoCode[];
+  pagination: { page: number; limit: number; total: number; totalPages: number };
+}> {
+  const searchParams = new URLSearchParams();
+  if (params?.type) searchParams.set('type', params.type);
+  if (params?.status) searchParams.set('status', params.status);
+  if (params?.campaign) searchParams.set('campaign', params.campaign);
+  if (params?.source) searchParams.set('source', params.source);
+  if (params?.search) searchParams.set('search', params.search);
+  if (params?.page) searchParams.set('page', params.page.toString());
+  if (params?.limit) searchParams.set('limit', params.limit.toString());
+
+  const url = `${API_BASE_URL}/api/admin/promos?${searchParams.toString()}`;
+
+  const res = await fetch(url, {
+    headers: {
+      'Authorization': `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+  });
+
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.error || 'Failed to fetch promo codes');
+  }
+
+  const data = await res.json();
+  return {
+    codes: (data.codes || []).map(transformPromoCode),
+    pagination: data.pagination,
+  };
+}
+
+// Create a promo code
+export async function createPromoCode(
+  accessToken: string,
+  params: {
+    code: string;
+    type: 'sourced' | 'manual';
+    maxUses?: number;
+    expiresAt?: string;
+    source?: string;
+    sourceUrl?: string;
+    campaign?: string;
+  }
+): Promise<PromoCode> {
+  const url = `${API_BASE_URL}/api/admin/promos`;
+
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      code: params.code,
+      type: params.type,
+      max_uses: params.maxUses || 1,
+      expires_at: params.expiresAt,
+      source: params.source,
+      source_url: params.sourceUrl,
+      campaign: params.campaign,
+    }),
+  });
+
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.message || errorData.error || 'Failed to create promo code');
+  }
+
+  const data = await res.json();
+  return transformPromoCode(data.code);
+}
+
+// Update a promo code
+export async function updatePromoCode(
+  accessToken: string,
+  id: string,
+  updates: {
+    isActive?: boolean;
+    status?: string;
+    maxUses?: number;
+    expiresAt?: string | null;
+    campaign?: string | null;
+    source?: string | null;
+    sourceUrl?: string | null;
+  }
+): Promise<PromoCode> {
+  const url = `${API_BASE_URL}/api/admin/promos/${id}`;
+
+  const body: Record<string, unknown> = {};
+  if (updates.isActive !== undefined) body.is_active = updates.isActive;
+  if (updates.status !== undefined) body.status = updates.status;
+  if (updates.maxUses !== undefined) body.max_uses = updates.maxUses;
+  if (updates.expiresAt !== undefined) body.expires_at = updates.expiresAt;
+  if (updates.campaign !== undefined) body.campaign = updates.campaign;
+  if (updates.source !== undefined) body.source = updates.source;
+  if (updates.sourceUrl !== undefined) body.source_url = updates.sourceUrl;
+
+  const res = await fetch(url, {
+    method: 'PATCH',
+    headers: {
+      'Authorization': `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.error || 'Failed to update promo code');
+  }
+
+  const data = await res.json();
+  return transformPromoCode(data.code);
+}
+
+// Bulk create promo codes
+export async function bulkCreatePromoCodes(
+  accessToken: string,
+  params: {
+    prefix: string;
+    count: number;
+    type: 'sourced' | 'manual';
+    maxUses?: number;
+    expiresAt?: string;
+    source?: string;
+    sourceUrl?: string;
+    campaign?: string;
+  }
+): Promise<PromoCode[]> {
+  const url = `${API_BASE_URL}/api/admin/promos/bulk`;
+
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      prefix: params.prefix,
+      count: params.count,
+      type: params.type,
+      max_uses: params.maxUses || 1,
+      expires_at: params.expiresAt,
+      source: params.source,
+      source_url: params.sourceUrl,
+      campaign: params.campaign,
+    }),
+  });
+
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.error || 'Failed to bulk create promo codes');
+  }
+
+  const data = await res.json();
+  return (data.codes || []).map(transformPromoCode);
+}
+
+// Get flagged attempts
+export async function getFlaggedAttempts(accessToken: string): Promise<FlaggedAttempt[]> {
+  const url = `${API_BASE_URL}/api/admin/promos/flagged`;
+
+  const res = await fetch(url, {
+    headers: {
+      'Authorization': `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+  });
+
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.error || 'Failed to fetch flagged attempts');
+  }
+
+  const data = await res.json();
+  return (data.flagged || []).map((f: Record<string, unknown>) => ({
+    id: f.id,
+    userId: f.user_id,
+    promoCodeId: f.promo_code_id,
+    attemptCount: f.attempt_count,
+    lastError: f.last_error,
+    flaggedAt: f.flagged_at,
+    resolvedAt: f.resolved_at,
+    notes: f.notes,
+    users: f.users,
+    promoCodes: f.promo_codes,
+  }));
+}
+
+// Resolve a flagged attempt
+export async function resolveFlaggedAttempt(
+  accessToken: string,
+  id: string,
+  notes?: string
+): Promise<void> {
+  const url = `${API_BASE_URL}/api/admin/promos/flagged/${id}/resolve`;
+
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ notes }),
+  });
+
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.error || 'Failed to resolve flagged attempt');
+  }
+}
+
+// Kill switch for promo codes
+export async function promoKillSwitch(
+  accessToken: string,
+  action: 'disable_all' | 'disable_sourced' | 'disable_welcome' | 'enable_all',
+  campaign?: string
+): Promise<{ affectedCount: number }> {
+  const url = `${API_BASE_URL}/api/admin/promos/kill-switch`;
+
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ action, campaign }),
+  });
+
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.error || 'Failed to execute kill switch');
+  }
+
+  return res.json();
+}
+
+// Get source performance stats
+export async function getSourceStats(accessToken: string): Promise<SourceStats[]> {
+  const url = `${API_BASE_URL}/api/admin/promos/sources`;
+
+  const res = await fetch(url, {
+    headers: {
+      'Authorization': `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+  });
+
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.error || 'Failed to fetch source stats');
+  }
+
+  const data = await res.json();
+  return data.sources || [];
+}
+
+// Get all campaigns
+export async function getCampaigns(accessToken: string): Promise<string[]> {
+  const url = `${API_BASE_URL}/api/admin/promos/campaigns`;
+
+  const res = await fetch(url, {
+    headers: {
+      'Authorization': `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+  });
+
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.error || 'Failed to fetch campaigns');
+  }
+
+  const data = await res.json();
+  return data.campaigns || [];
 }

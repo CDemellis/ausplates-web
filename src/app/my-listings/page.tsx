@@ -10,6 +10,98 @@ import { formatPrice } from '@/types/listing';
 
 type StatusFilter = 'all' | 'active' | 'draft' | 'sold';
 
+// Helper to format boost expiry time
+function formatBoostExpiry(expiresAt: string): { text: string; isExpiringSoon: boolean; isExpired: boolean } {
+  const now = new Date();
+  const expiry = new Date(expiresAt);
+  const diffMs = expiry.getTime() - now.getTime();
+
+  if (diffMs <= 0) {
+    return { text: 'Expired', isExpiringSoon: false, isExpired: true };
+  }
+
+  const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+  const diffDays = Math.floor(diffHours / 24);
+  const remainingHours = diffHours % 24;
+
+  const isExpiringSoon = diffHours < 24;
+
+  if (diffDays > 0) {
+    return {
+      text: `${diffDays}d ${remainingHours}h remaining`,
+      isExpiringSoon,
+      isExpired: false
+    };
+  }
+
+  if (diffHours > 0) {
+    const diffMinutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+    return {
+      text: `${diffHours}h ${diffMinutes}m remaining`,
+      isExpiringSoon,
+      isExpired: false
+    };
+  }
+
+  const diffMinutes = Math.floor(diffMs / (1000 * 60));
+  return {
+    text: `${diffMinutes}m remaining`,
+    isExpiringSoon: true,
+    isExpired: false
+  };
+}
+
+// Boost Status Banner Component
+function BoostStatusBanner({ listing }: { listing: UserListing }) {
+  if (!listing.isFeatured || !listing.boostExpiresAt) return null;
+
+  const { text, isExpiringSoon, isExpired } = formatBoostExpiry(listing.boostExpiresAt);
+
+  if (isExpired) return null;
+
+  const is30DayBoost = listing.bumpsRemaining > 0 || (listing.bumpedAt !== undefined && listing.bumpedAt !== null);
+
+  return (
+    <div className={`mt-3 p-3 rounded-xl border ${
+      isExpiringSoon
+        ? 'bg-orange-50 border-orange-200'
+        : 'bg-[var(--gold)]/10 border-[var(--gold)]/30'
+    }`}>
+      <div className="flex items-center gap-2">
+        <svg className={`w-4 h-4 flex-shrink-0 ${isExpiringSoon ? 'text-orange-600' : 'text-[var(--gold)]'}`} fill="currentColor" viewBox="0 0 20 20">
+          <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+        </svg>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className={`text-sm font-medium ${isExpiringSoon ? 'text-orange-700' : 'text-[var(--text)]'}`}>
+              {is30DayBoost ? 'Boost Pro' : 'Boost'} Active
+            </span>
+            <span className={`text-sm ${isExpiringSoon ? 'text-orange-600' : 'text-[var(--text-secondary)]'}`}>
+              • {text}
+            </span>
+          </div>
+          {is30DayBoost && (
+            <div className="text-xs text-[var(--text-muted)] mt-1">
+              {listing.bumpsRemaining > 0
+                ? `${listing.bumpsRemaining} bump${listing.bumpsRemaining !== 1 ? 's' : ''} remaining`
+                : 'No bumps remaining'
+              }
+            </div>
+          )}
+        </div>
+        {isExpiringSoon && (
+          <Link
+            href={`/my-listings/${listing.id}/boost`}
+            className="text-xs font-medium text-orange-700 hover:text-orange-800 underline flex-shrink-0"
+          >
+            Renew
+          </Link>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function MyListingsPage() {
   const router = useRouter();
   const { isAuthenticated, isLoading: authLoading, getAccessToken } = useAuth();
@@ -348,6 +440,9 @@ export default function MyListingsPage() {
                       Delete
                     </button>
                   </div>
+
+                  {/* Boost Status Banner */}
+                  <BoostStatusBanner listing={listing} />
                 </div>
               </div>
             ))}

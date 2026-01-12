@@ -329,3 +329,22 @@ export async function linkEmail(accessToken: string, email: string, password: st
     requiresVerification: data.requires_verification,
   };
 }
+
+// Delete account
+export async function deleteAccount(accessToken: string): Promise<{ success: boolean; message: string }> {
+  const res = await fetch(`${API_BASE_URL}/api/auth/me`, {
+    method: 'DELETE',
+    headers: {
+      'Authorization': `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+  });
+
+  const data = await res.json();
+
+  if (!res.ok) {
+    throw new Error(data.error || 'Failed to delete account');
+  }
+
+  return data;
+}
