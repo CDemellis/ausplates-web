@@ -3,12 +3,12 @@ import type { NextRequest } from 'next/server';
 
 // Routes that require authentication
 const PROTECTED_ROUTES = [
-  '/plates',
-  '/plate',
   '/saved',
   '/messages',
   '/profile',
   '/create',
+  '/my-listings',
+  '/notifications',
 ];
 
 // Routes that should redirect to home if already authenticated
@@ -48,12 +48,12 @@ export function middleware(request: NextRequest) {
 export const config = {
   matcher: [
     // Match protected routes
-    '/plates/:path*',
-    '/plate/:path*',
     '/saved/:path*',
     '/messages/:path*',
     '/profile/:path*',
     '/create/:path*',
+    '/my-listings/:path*',
+    '/notifications/:path*',
     // Match auth routes
     '/signin',
     '/signup',
