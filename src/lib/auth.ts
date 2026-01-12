@@ -198,14 +198,33 @@ export async function signOut(accessToken: string): Promise<void> {
 const ACCESS_TOKEN_KEY = 'ausplates_access_token';
 const REFRESH_TOKEN_KEY = 'ausplates_refresh_token';
 
-// Cookie helpers for middleware access
+// Cookie helpers for middleware access (shared across subdomains)
+function getCookieDomain(): string {
+  if (typeof window === 'undefined') return '';
+  const hostname = window.location.hostname;
+  // Use .ausplates.app for production to share across subdomains
+  if (hostname.endsWith('ausplates.app')) {
+    return '; domain=.ausplates.app';
+  }
+  // Local development - no domain restriction
+  return '';
+}
+
 function setCookie(name: string, value: string, days: number = 30) {
   const expires = new Date(Date.now() + days * 24 * 60 * 60 * 1000).toUTCString();
-  document.cookie = `${name}=${value}; expires=${expires}; path=/; SameSite=Lax`;
+  const domain = getCookieDomain();
+  document.cookie = `${name}=${value}; expires=${expires}; path=/${domain}; SameSite=Lax`;
 }
 
 function deleteCookie(name: string) {
-  document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`;
+  const domain = getCookieDomain();
+  document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/${domain};`;
+}
+
+function getCookie(name: string): string | null {
+  if (typeof document === 'undefined') return null;
+  const match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
+  return match ? match[2] : null;
 }
 
 export function saveTokens(session: Session) {
@@ -223,9 +242,10 @@ export function getTokens(): { accessToken: string | null; refreshToken: string 
   if (typeof window === 'undefined') {
     return { accessToken: null, refreshToken: null };
   }
+  // Try localStorage first, fall back to cookies (for cross-subdomain auth)
   return {
-    accessToken: localStorage.getItem(ACCESS_TOKEN_KEY),
-    refreshToken: localStorage.getItem(REFRESH_TOKEN_KEY),
+    accessToken: localStorage.getItem(ACCESS_TOKEN_KEY) || getCookie(ACCESS_TOKEN_KEY),
+    refreshToken: localStorage.getItem(REFRESH_TOKEN_KEY) || getCookie(REFRESH_TOKEN_KEY),
   };
 }
 
