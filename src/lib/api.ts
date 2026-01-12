@@ -510,9 +510,10 @@ export async function getMessages(accessToken: string, conversationId: string, s
   return (data.data || []).map(transformMessage);
 }
 
-// Send a message
+// Send a message to an existing conversation
 export async function sendMessage(accessToken: string, conversationId: string, content: string): Promise<Message> {
-  const url = `${API_BASE_URL}/api/messages/conversations/${conversationId}/messages`;
+  // API endpoint is POST /conversations/:id (not /conversations/:id/messages)
+  const url = `${API_BASE_URL}/api/messages/conversations/${conversationId}`;
 
   const res = await fetch(url, {
     method: 'POST',
@@ -527,8 +528,9 @@ export async function sendMessage(accessToken: string, conversationId: string, c
     throw new Error('Failed to send message');
   }
 
-  const data: { data: APIMessage } = await res.json();
-  return transformMessage(data.data);
+  // API returns message directly, not wrapped in { data: ... }
+  const data: APIMessage = await res.json();
+  return transformMessage(data);
 }
 
 // Start a new conversation (contact seller)
