@@ -1,5 +1,8 @@
 'use client';
 
+import { useEffect } from 'react';
+import { captureError } from '@/lib/sentry';
+
 export default function GlobalError({
   error,
   reset,
@@ -7,6 +10,15 @@ export default function GlobalError({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  useEffect(() => {
+    // Send critical error to Sentry
+    captureError(error, {
+      tags: { source: 'GlobalError', severity: 'critical' },
+      extra: { digest: error.digest },
+      level: 'fatal',
+    });
+  }, [error]);
+
   return (
     <html lang="en">
       <body>

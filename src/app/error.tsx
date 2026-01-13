@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react';
 import Link from 'next/link';
+import { captureError } from '@/lib/sentry';
 
 export default function Error({
   error,
@@ -11,8 +12,18 @@ export default function Error({
   reset: () => void;
 }) {
   useEffect(() => {
-    // Log the error to an error reporting service
-    console.error('Application error:', error);
+    // Log error in development
+    if (process.env.NODE_ENV === 'development') {
+      console.error('Application error:', error);
+    }
+
+    // Send to Sentry error tracking
+    captureError(error, {
+      tags: { source: 'NextErrorPage' },
+      extra: {
+        digest: error.digest,
+      },
+    });
   }, [error]);
 
   return (

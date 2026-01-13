@@ -2,6 +2,7 @@
 
 import { Component, ReactNode } from 'react';
 import Link from 'next/link';
+import { captureError } from '@/lib/sentry';
 
 interface ErrorBoundaryProps {
   children: ReactNode;
@@ -25,10 +26,17 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
     // Log error to console in development
-    console.error('ErrorBoundary caught an error:', error, errorInfo);
+    if (process.env.NODE_ENV === 'development') {
+      console.error('ErrorBoundary caught an error:', error, errorInfo);
+    }
 
-    // In production, you could send to error tracking service here
-    // e.g., Sentry, LogRocket, etc.
+    // Send to Sentry error tracking
+    captureError(error, {
+      tags: { source: 'ErrorBoundary' },
+      extra: {
+        componentStack: errorInfo.componentStack,
+      },
+    });
   }
 
   handleRetry = () => {
