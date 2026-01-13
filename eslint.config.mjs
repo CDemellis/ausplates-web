@@ -13,6 +13,15 @@ const eslintConfig = defineConfig([
     "build/**",
     "next-env.d.ts",
   ]),
+  // Disable no-img-element warning - we intentionally use <img> for:
+  // - User avatars from external Supabase storage URLs
+  // - Photo galleries with dynamic external URLs
+  // - Profile images with unpredictable dimensions
+  {
+    rules: {
+      "@next/next/no-img-element": "off",
+    },
+  },
 ]);
 
 export default eslintConfig;
