@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/lib/auth-context';
 import { getPromoCodes, PromoCode, updatePromoCode } from '@/lib/api';
@@ -14,11 +14,9 @@ export default function WelcomeCodesPage() {
   const [totalPages, setTotalPages] = useState(1);
   const [statusFilter, setStatusFilter] = useState<string>('');
 
-  useEffect(() => {
-    loadCodes();
-  }, [page, statusFilter]);
+  const prevFiltersRef = useRef({ page, statusFilter });
 
-  const loadCodes = async () => {
+  const loadCodes = useCallback(async () => {
     try {
       setIsLoading(true);
       const token = await getAccessToken();
@@ -37,7 +35,18 @@ export default function WelcomeCodesPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [getAccessToken, statusFilter, page]);
+
+  useEffect(() => {
+    const prev = prevFiltersRef.current;
+    const filtersChanged = prev.page !== page || prev.statusFilter !== statusFilter;
+
+    if (filtersChanged) {
+      prevFiltersRef.current = { page, statusFilter };
+    }
+
+    loadCodes();
+  }, [loadCodes, page, statusFilter]);
 
   const handleDeactivate = async (code: PromoCode) => {
     if (!confirm(`Deactivate code ${code.code}?`)) return;

@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useEffect, useState } from 'react';
+import { Suspense, useEffect, useState, useRef, useCallback } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/lib/auth-context';
@@ -19,11 +19,9 @@ function ManualCodesContent() {
   // Get type from URL param - defaults to showing both sourced and manual
   const typeFilter = searchParams.get('type') || '';
 
-  useEffect(() => {
-    loadCodes();
-  }, [page, search, typeFilter]);
+  const prevFiltersRef = useRef({ page, search, typeFilter });
 
-  const loadCodes = async () => {
+  const loadCodes = useCallback(async () => {
     try {
       setIsLoading(true);
       const token = await getAccessToken();
@@ -42,7 +40,18 @@ function ManualCodesContent() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [getAccessToken, typeFilter, search, page]);
+
+  useEffect(() => {
+    const prev = prevFiltersRef.current;
+    const filtersChanged = prev.page !== page || prev.search !== search || prev.typeFilter !== typeFilter;
+
+    if (filtersChanged) {
+      prevFiltersRef.current = { page, search, typeFilter };
+    }
+
+    loadCodes();
+  }, [loadCodes, page, search, typeFilter]);
 
   const handleDeactivate = async (code: PromoCode) => {
     if (!confirm(`Deactivate code ${code.code}?`)) return;

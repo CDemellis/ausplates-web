@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/lib/auth-context';
 import { getSourceStats, SourceStats } from '@/lib/api';
@@ -11,11 +11,9 @@ export default function SourcesPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
 
-  useEffect(() => {
-    loadSources();
-  }, []);
+  const hasLoaded = useRef(false);
 
-  const loadSources = async () => {
+  const loadSources = useCallback(async () => {
     try {
       setIsLoading(true);
       const token = await getAccessToken();
@@ -28,7 +26,13 @@ export default function SourcesPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [getAccessToken]);
+
+  useEffect(() => {
+    if (hasLoaded.current) return;
+    hasLoaded.current = true;
+    loadSources();
+  }, [loadSources]);
 
   if (isLoading) {
     return (

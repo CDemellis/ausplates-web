@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/lib/auth-context';
 import { getFlaggedAttempts, FlaggedAttempt, resolveFlaggedAttempt } from '@/lib/api';
@@ -13,11 +13,9 @@ export default function FlaggedPage() {
   const [resolvingId, setResolvingId] = useState<string | null>(null);
   const [notes, setNotes] = useState('');
 
-  useEffect(() => {
-    loadFlagged();
-  }, []);
+  const hasLoaded = useRef(false);
 
-  const loadFlagged = async () => {
+  const loadFlagged = useCallback(async () => {
     try {
       setIsLoading(true);
       const token = await getAccessToken();
@@ -30,7 +28,13 @@ export default function FlaggedPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [getAccessToken]);
+
+  useEffect(() => {
+    if (hasLoaded.current) return;
+    hasLoaded.current = true;
+    loadFlagged();
+  }, [loadFlagged]);
 
   const handleResolve = async (id: string) => {
     try {

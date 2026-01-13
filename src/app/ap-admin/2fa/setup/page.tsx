@@ -1,26 +1,23 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import Image from 'next/image';
+// Next.js Image component not used - using img for QR code data URL
 import { useAuth } from '@/lib/auth-context';
 import { setup2FA, verify2FA, TotpSetupResponse } from '@/lib/admin';
 
 export default function TwoFactorSetupPage() {
   const router = useRouter();
-  const { user, getAccessToken } = useAuth();
+  const { getAccessToken, user } = useAuth();
   const [setupData, setSetupData] = useState<TotpSetupResponse | null>(null);
   const [code, setCode] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [isVerifying, setIsVerifying] = useState(false);
   const [error, setError] = useState('');
   const [showManualEntry, setShowManualEntry] = useState(false);
+  const hasInitialized = useRef(false);
 
-  useEffect(() => {
-    initSetup();
-  }, []);
-
-  const initSetup = async () => {
+  const initSetup = useCallback(async () => {
     try {
       setIsLoading(true);
       const token = await getAccessToken();
@@ -38,7 +35,13 @@ export default function TwoFactorSetupPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [getAccessToken]);
+
+  useEffect(() => {
+    if (hasInitialized.current) return;
+    hasInitialized.current = true;
+    initSetup();
+  }, [initSetup]);
 
   const handleVerify = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -107,7 +110,6 @@ export default function TwoFactorSetupPage() {
                 </p>
                 <div className="flex justify-center">
                   <div className="bg-white p-4 rounded-lg border border-[#EBEBEB]">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={setupData.qrCodeDataUrl}
                       alt="2FA QR Code"

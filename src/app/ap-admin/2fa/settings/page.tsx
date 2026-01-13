@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { getAdminStatus, disable2FA, AdminStatus } from '@/lib/admin';
@@ -15,12 +15,9 @@ export default function TwoFactorSettingsPage() {
   const [isDisabling, setIsDisabling] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const hasLoaded = useRef(false);
 
-  useEffect(() => {
-    loadStatus();
-  }, []);
-
-  const loadStatus = async () => {
+  const loadStatus = useCallback(async () => {
     try {
       setIsLoading(true);
       const token = await getAccessToken();
@@ -33,7 +30,13 @@ export default function TwoFactorSettingsPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [getAccessToken]);
+
+  useEffect(() => {
+    if (hasLoaded.current) return;
+    hasLoaded.current = true;
+    loadStatus();
+  }, [loadStatus]);
 
   const handleDisable2FA = async (e: React.FormEvent) => {
     e.preventDefault();
