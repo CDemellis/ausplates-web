@@ -7,6 +7,7 @@ import {
   formatTimeAgo,
   STATE_NAMES,
   PLATE_TYPE_NAMES,
+  Listing,
 } from '@/types/listing';
 import { PlateFeatureTags } from '@/components/PlateFeatureTags';
 import { PlateView } from '@/components/PlateView';
@@ -24,7 +25,7 @@ interface PageProps {
 // Consistent light gray container for all plates
 const CONTAINER_COLOR = '#F0F0F0';
 
-function PlateHero({ listing }: { listing: any }) {
+function PlateHero({ listing }: { listing: Listing }) {
   return (
     <div
       className="relative rounded-2xl p-8 md:p-12 flex flex-col items-center justify-center min-h-[300px]"

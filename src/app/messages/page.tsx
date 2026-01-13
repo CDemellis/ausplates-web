@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { getConversations, Conversation } from '@/lib/api';
-import { formatPrice, formatTimeAgo } from '@/types/listing';
+import { formatTimeAgo } from '@/types/listing';
 
 function ConversationRow({ conversation }: { conversation: Conversation }) {
   const hasUnread = conversation.unreadCount > 0;

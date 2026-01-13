@@ -1,7 +1,6 @@
 import { PlateFormatIcon } from './icons';
 import {
   Listing,
-  PlateColorScheme,
   PlateSizeFormat,
   PlateMaterial,
   VehicleType,
@@ -140,15 +139,7 @@ function MaterialIcon({ material }: { material: PlateMaterial }) {
   }
 }
 
-function CharCountIcon() {
-  return (
-    <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
-      <path d="M3 5C3 4.4 3.4 4 4 4H8C8.6 4 9 4.4 9 5V6H11V5C11 4.4 11.4 4 12 4H16C16.6 4 17 4.4 17 5V7C17 7.6 16.6 8 16 8H12C11.4 8 11 7.6 11 7V6H9V7C9 7.6 8.6 8 8 8H4C3.4 8 3 7.6 3 7V5Z" />
-      <path d="M5 11H15V13H5V11Z" />
-      <path d="M5 15H12V17H5V15Z" />
-    </svg>
-  );
-}
+// CharCountIcon removed - not currently used
 
 function VehicleIcon({ vehicleType }: { vehicleType: VehicleType }) {
   const iconClass = "w-3.5 h-3.5";

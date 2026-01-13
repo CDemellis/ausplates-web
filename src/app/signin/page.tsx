@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useState, useEffect } from 'react';
+import { Suspense, useState, useEffect, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
@@ -76,21 +76,25 @@ function SignInForm() {
 
   const redirect = searchParams.get('redirect') || '/';
 
+  const hasRedirected = useRef(false);
+
   // Helper to handle redirect (supports both relative paths and full URLs)
-  const doRedirect = (url: string) => {
+  const doRedirect = useCallback((url: string) => {
     if (url.startsWith('http://') || url.startsWith('https://')) {
       window.location.href = url;
     } else {
       router.push(url);
     }
-  };
+  }, [router]);
 
   // Redirect if already authenticated
   useEffect(() => {
+    if (hasRedirected.current) return;
     if (!authLoading && isAuthenticated) {
+      hasRedirected.current = true;
       doRedirect(redirect);
     }
-  }, [authLoading, isAuthenticated, redirect, router]);
+  }, [authLoading, isAuthenticated, redirect, doRedirect]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

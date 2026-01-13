@@ -2,9 +2,8 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
-import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
-import { saveTokens, Session, User } from '@/lib/auth';
+import { Session, User } from '@/lib/auth';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://ausplates.onrender.com';
 
@@ -27,7 +26,6 @@ interface Props {
 }
 
 export function QRLogin({ onSuccess }: Props) {
-  const router = useRouter();
   const { setUserFromSignIn } = useAuth();
   const [session, setSession] = useState<QRSession | null>(null);
   const [status, setStatus] = useState<'loading' | 'pending' | 'confirmed' | 'expired' | 'error'>('loading');
@@ -131,7 +129,7 @@ export function QRLogin({ onSuccess }: Props) {
     } catch (err) {
       console.error('Polling error:', err);
     }
-  }, [session, router, setUserFromSignIn, onSuccess]);
+  }, [session, setUserFromSignIn, onSuccess]);
 
   // Create session on mount
   useEffect(() => {

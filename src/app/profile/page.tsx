@@ -32,13 +32,7 @@ function CheckIcon() {
   );
 }
 
-function UnlinkedIcon() {
-  return (
-    <svg className="w-5 h-5 text-[var(--text-muted)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <circle cx="12" cy="12" r="10" strokeWidth="2" />
-    </svg>
-  );
-}
+// Removed unused UnlinkedIcon component
 
 function AppleIcon({ className }: { className?: string }) {
   return (
@@ -445,7 +439,7 @@ function EditProfileSection({ user, onUpdate }: { user: { fullName: string; avat
                   />
                   <div>
                     <span className="font-medium text-[var(--text)]">Saved Plate Updates</span>
-                    <p className="text-sm text-[var(--text-muted)]">Get updates about plates you've saved</p>
+                    <p className="text-sm text-[var(--text-muted)]">Get updates about plates you&apos;ve saved</p>
                   </div>
                 </label>
 
