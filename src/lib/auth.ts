@@ -258,23 +258,45 @@ function getCookie(name: string): string | null {
 }
 
 /**
- * Basic token format validation to prevent storing malicious data.
- * JWTs have 3 base64url-encoded parts separated by dots.
+ * Validates JWT format for access tokens.
+ * JWTs have 3 base64url-encoded parts separated by dots (header.payload.signature).
+ * This validates the structure to prevent XSS payload injection.
  */
 function isValidJwtFormat(token: string): boolean {
   if (!token || typeof token !== 'string') return false;
   const parts = token.split('.');
   if (parts.length !== 3) return false;
   // Check each part is valid base64url (alphanumeric, -, _, no spaces)
+  // Note: base64url omits padding '=' characters
   const base64urlRegex = /^[A-Za-z0-9_-]+$/;
   return parts.every(part => part.length > 0 && base64urlRegex.test(part));
 }
 
+/**
+ * Validates refresh token format.
+ * Supabase refresh tokens are opaque strings (NOT JWTs), typically ~40 characters.
+ * They contain only alphanumeric characters and possibly hyphens/underscores.
+ * This validates the format to prevent XSS payload injection.
+ */
+function isValidRefreshTokenFormat(token: string): boolean {
+  if (!token || typeof token !== 'string') return false;
+  // Supabase refresh tokens are alphanumeric strings, typically 20-100 chars
+  // Must not contain any special characters that could enable XSS
+  const refreshTokenRegex = /^[A-Za-z0-9_-]+$/;
+  return token.length >= 10 && token.length <= 200 && refreshTokenRegex.test(token);
+}
+
 export function saveTokens(session: Session) {
   if (typeof window !== 'undefined') {
-    // Validate token format before storing to prevent XSS payload injection
-    if (!isValidJwtFormat(session.accessToken) || !isValidJwtFormat(session.refreshToken)) {
-      console.error('Invalid token format detected, not storing');
+    // Validate token formats before storing to prevent XSS payload injection
+    // Access tokens are JWTs (3 parts separated by dots)
+    // Refresh tokens are opaque strings (NOT JWTs)
+    if (!isValidJwtFormat(session.accessToken)) {
+      console.error('Invalid access token format detected, not storing');
+      return;
+    }
+    if (!isValidRefreshTokenFormat(session.refreshToken)) {
+      console.error('Invalid refresh token format detected, not storing');
       return;
     }
     // Store in localStorage for client-side access
@@ -294,10 +316,10 @@ export function getTokens(): { accessToken: string | null; refreshToken: string 
   const accessToken = localStorage.getItem(ACCESS_TOKEN_KEY) || getCookie(ACCESS_TOKEN_KEY);
   const refreshToken = localStorage.getItem(REFRESH_TOKEN_KEY) || getCookie(REFRESH_TOKEN_KEY);
 
-  // Validate tokens on retrieval as well
+  // Validate tokens on retrieval as well (using correct format for each token type)
   return {
     accessToken: accessToken && isValidJwtFormat(accessToken) ? accessToken : null,
-    refreshToken: refreshToken && isValidJwtFormat(refreshToken) ? refreshToken : null,
+    refreshToken: refreshToken && isValidRefreshTokenFormat(refreshToken) ? refreshToken : null,
   };
 }
 
