@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { Geist, Geist_Mono, Bebas_Neue } from 'next/font/google';
 import { Header } from '@/components/Header';
 import { Footer } from '@/components/Footer';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { AuthProvider } from '@/lib/auth-context';
 import { SavedProvider } from '@/lib/saved-context';
 import './globals.css';
@@ -72,20 +73,22 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${geistSans.variable} ${geistMono.variable} ${bebasNeue.variable} antialiased`}>
-        <AuthProvider>
-          <SavedProvider>
-            {/* Skip to main content link for keyboard users */}
-            <a
-              href="#main"
-              className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 focus:px-4 focus:py-2 focus:bg-[var(--green)] focus:text-white focus:rounded-lg focus:shadow-lg focus:outline-none"
-            >
-              Skip to main content
-            </a>
-            <Header />
-            <main id="main" className="min-h-screen">{children}</main>
-            <Footer />
-          </SavedProvider>
-        </AuthProvider>
+        <ErrorBoundary>
+          <AuthProvider>
+            <SavedProvider>
+              {/* Skip to main content link for keyboard users */}
+              <a
+                href="#main"
+                className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 focus:px-4 focus:py-2 focus:bg-[var(--green)] focus:text-white focus:rounded-lg focus:shadow-lg focus:outline-none"
+              >
+                Skip to main content
+              </a>
+              <Header />
+              <main id="main" className="min-h-screen">{children}</main>
+              <Footer />
+            </SavedProvider>
+          </AuthProvider>
+        </ErrorBoundary>
       </body>
     </html>
   );
