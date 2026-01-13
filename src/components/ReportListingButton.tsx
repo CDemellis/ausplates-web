@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import { useAuth } from '@/lib/auth-context';
-import { getTokens } from '@/lib/auth';
 import { reportListing, ReportReason } from '@/lib/api';
 
 interface ReportListingButtonProps {
@@ -40,7 +39,7 @@ const REPORT_REASONS: { value: ReportReason; label: string; description: string 
 ];
 
 export function ReportListingButton({ listingId, combination, sellerId }: ReportListingButtonProps) {
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, getAccessToken } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const [selectedReason, setSelectedReason] = useState<ReportReason | null>(null);
   const [details, setDetails] = useState('');
@@ -86,7 +85,7 @@ export function ReportListingButton({ listingId, combination, sellerId }: Report
       return;
     }
 
-    const { accessToken } = getTokens();
+    const accessToken = await getAccessToken();
     if (!accessToken) {
       setError('You must be signed in to report a listing');
       return;

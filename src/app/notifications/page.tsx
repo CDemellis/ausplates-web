@@ -1,10 +1,9 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
-import { getTokens } from '@/lib/auth';
 import {
   getNotifications,
   markNotificationRead,
@@ -153,7 +152,7 @@ function NotificationSkeleton() {
 
 export default function NotificationsPage() {
   const router = useRouter();
-  const { isLoading: authLoading, isAuthenticated } = useAuth();
+  const { isLoading: authLoading, isAuthenticated, getAccessToken } = useAuth();
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
@@ -164,14 +163,8 @@ export default function NotificationsPage() {
     }
   }, [authLoading, isAuthenticated, router]);
 
-  useEffect(() => {
-    if (isAuthenticated) {
-      loadNotifications();
-    }
-  }, [isAuthenticated]);
-
-  const loadNotifications = async () => {
-    const { accessToken } = getTokens();
+  const loadNotifications = useCallback(async () => {
+    const accessToken = await getAccessToken();
     if (!accessToken) return;
 
     try {
@@ -182,10 +175,16 @@ export default function NotificationsPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [getAccessToken]);
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      loadNotifications();
+    }
+  }, [isAuthenticated, loadNotifications]);
 
   const handleNotificationTap = async (notification: AppNotification) => {
-    const { accessToken } = getTokens();
+    const accessToken = await getAccessToken();
 
     // Mark as read
     if (!notification.isRead && accessToken) {
@@ -204,7 +203,7 @@ export default function NotificationsPage() {
   };
 
   const handleDelete = async (notificationId: string) => {
-    const { accessToken } = getTokens();
+    const accessToken = await getAccessToken();
     if (!accessToken) return;
 
     setNotifications((prev) => prev.filter((n) => n.id !== notificationId));
@@ -212,7 +211,7 @@ export default function NotificationsPage() {
   };
 
   const handleMarkAllRead = async () => {
-    const { accessToken } = getTokens();
+    const accessToken = await getAccessToken();
     if (!accessToken) return;
 
     setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));

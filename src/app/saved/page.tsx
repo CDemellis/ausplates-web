@@ -1,17 +1,16 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
-import { getTokens } from '@/lib/auth';
 import { getSavedListings } from '@/lib/api';
 import { Listing } from '@/types/listing';
 import { ListingCard, ListingCardSkeleton } from '@/components/ListingCard';
 
 export default function SavedPage() {
   const router = useRouter();
-  const { isLoading: authLoading, isAuthenticated } = useAuth();
+  const { isLoading: authLoading, isAuthenticated, getAccessToken } = useAuth();
   const [savedListings, setSavedListings] = useState<Listing[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
@@ -22,14 +21,8 @@ export default function SavedPage() {
     }
   }, [authLoading, isAuthenticated, router]);
 
-  useEffect(() => {
-    if (isAuthenticated) {
-      loadSavedListings();
-    }
-  }, [isAuthenticated]);
-
-  const loadSavedListings = async () => {
-    const { accessToken } = getTokens();
+  const loadSavedListings = useCallback(async () => {
+    const accessToken = await getAccessToken();
     if (!accessToken) return;
 
     try {
@@ -40,7 +33,13 @@ export default function SavedPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [getAccessToken]);
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      loadSavedListings();
+    }
+  }, [isAuthenticated, loadSavedListings]);
 
   if (authLoading) {
     return (
