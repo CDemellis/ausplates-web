@@ -4,7 +4,7 @@ import { useState, useEffect, use } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/lib/auth-context';
-import { getListingBySlug, updateListing, UpdateListingData } from '@/lib/api';
+import { updateListing, UpdateListingData } from '@/lib/api';
 import { revalidateListing } from '@/app/actions';
 import { PlateView } from '@/components/PlateView';
 import {
@@ -186,7 +186,7 @@ export default function EditListingPage({ params }: PageProps) {
       if (!token) throw new Error('Not authenticated');
 
       // Upload any new photos first
-      let allPhotoUrls = [...form.photos];
+      const allPhotoUrls = [...form.photos];
       if (newPhotos.length > 0) {
         setIsUploadingPhotos(true);
         const { uploadPhoto } = await import('@/lib/api');

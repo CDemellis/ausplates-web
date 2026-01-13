@@ -8,6 +8,7 @@ import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-
 import { useAuth } from '@/lib/auth-context';
 import { createBoostCheckout, confirmBoostPayment, validatePromoCode } from '@/lib/api';
 import { PlateView } from '@/components/PlateView';
+import type { AustralianState, PlateColorScheme } from '@/types/listing';
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -421,8 +422,8 @@ export default function BoostListingPage({ params }: PageProps) {
               </div>
               <PlateView
                 combination={listing.combination}
-                state={listing.state as any}
-                colorScheme={listing.color_scheme as any}
+                state={listing.state as AustralianState}
+                colorScheme={listing.color_scheme as PlateColorScheme}
                 size="medium"
               />
               <p className="mt-3 text-white/60 text-sm">{listing.state}</p>
@@ -486,8 +487,8 @@ export default function BoostListingPage({ params }: PageProps) {
           <div className="bg-gradient-to-br from-slate-900 to-slate-800 p-6 flex flex-col items-center">
             <PlateView
               combination={listing.combination}
-              state={listing.state as any}
-              colorScheme={listing.color_scheme as any}
+              state={listing.state as AustralianState}
+              colorScheme={listing.color_scheme as PlateColorScheme}
               size="large"
             />
             <p className="mt-3 text-white/60 text-sm">{listing.state}</p>

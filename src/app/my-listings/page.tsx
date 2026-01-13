@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { useAuth } from '@/lib/auth-context';
 import { getUserListings, deleteListing, updateListing, bumpListing, UserListing } from '@/lib/api';
 import { PlateView } from '@/components/PlateView';
-import { formatPrice } from '@/types/listing';
+import { formatPrice, AustralianState, PlateColorScheme } from '@/types/listing';
 
 type StatusFilter = 'all' | 'active' | 'draft' | 'sold';
 
@@ -133,8 +133,8 @@ export default function MyListingsPage() {
         const token = await getAccessToken();
         if (!token) throw new Error('Not authenticated');
 
-        const status = statusFilter === 'all' ? undefined : statusFilter;
-        const data = await getUserListings(token, status as any);
+        const status = statusFilter === 'all' ? undefined : statusFilter as 'draft' | 'active' | 'sold';
+        const data = await getUserListings(token, status);
         setListings(data);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load listings');
@@ -339,8 +339,8 @@ export default function MyListingsPage() {
                   <div className="w-32 h-20 bg-[var(--background-subtle)] rounded-lg flex items-center justify-center">
                     <PlateView
                       combination={listing.combination}
-                      state={listing.state as any}
-                      colorScheme={listing.colorScheme as any}
+                      state={listing.state as AustralianState}
+                      colorScheme={listing.colorScheme as PlateColorScheme}
                       size="small"
                     />
                   </div>

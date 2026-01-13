@@ -8,7 +8,7 @@ import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-
 import { useAuth } from '@/lib/auth-context';
 import { createCheckout, confirmPayment, validatePromoCode, redeemPromoCode } from '@/lib/api';
 import { PlateView } from '@/components/PlateView';
-import { PLATE_TYPE_NAMES } from '@/types/listing';
+import { PLATE_TYPE_NAMES, AustralianState, PlateColorScheme } from '@/types/listing';
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -424,8 +424,8 @@ export default function PayDraftListingPage({ params }: PageProps) {
               )}
               <PlateView
                 combination={listing.combination}
-                state={listing.state as any}
-                colorScheme={listing.color_scheme as any}
+                state={listing.state as AustralianState}
+                colorScheme={listing.color_scheme as PlateColorScheme}
                 size="medium"
               />
               <p className="mt-3 text-white/60 text-sm">
@@ -506,8 +506,8 @@ export default function PayDraftListingPage({ params }: PageProps) {
           <div className="bg-gradient-to-br from-slate-900 to-slate-800 p-6 flex flex-col items-center">
             <PlateView
               combination={listing.combination}
-              state={listing.state as any}
-              colorScheme={listing.color_scheme as any}
+              state={listing.state as AustralianState}
+              colorScheme={listing.color_scheme as PlateColorScheme}
               size="large"
             />
             <p className="mt-3 text-white/60 text-sm">
