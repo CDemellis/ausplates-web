@@ -5,6 +5,29 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { saveTokens, getCurrentUser, Session, User } from '@/lib/auth';
 
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://ausplates.onrender.com';
+
+// Exchange auth code for tokens via secure POST request
+async function exchangeAuthCode(code: string): Promise<{
+  accessToken: string;
+  refreshToken: string;
+  expiresAt: number;
+  isNewUser: boolean;
+}> {
+  const res = await fetch(`${API_BASE_URL}/api/auth/exchange`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ code }),
+  });
+
+  if (!res.ok) {
+    const data = await res.json();
+    throw new Error(data.error || 'Failed to exchange auth code');
+  }
+
+  return res.json();
+}
+
 function CallbackHandler() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -20,23 +43,24 @@ function CallbackHandler() {
         return;
       }
 
-      // Extract tokens from URL
-      const accessToken = searchParams.get('accessToken');
-      const refreshToken = searchParams.get('refreshToken');
-      const expiresAt = searchParams.get('expiresAt');
-      const isNewUser = searchParams.get('isNewUser') === 'true';
+      // Get auth code from URL (secure: tokens are NOT in URL)
+      const code = searchParams.get('code');
 
-      if (!accessToken || !refreshToken || !expiresAt) {
-        setError('Missing authentication data');
+      if (!code) {
+        setError('Missing authentication code');
         return;
       }
 
       try {
+        // Exchange auth code for tokens via secure POST request
+        // This prevents tokens from appearing in browser history, logs, or referrer headers
+        const { accessToken, refreshToken, expiresAt, isNewUser } = await exchangeAuthCode(code);
+
         // Create session object
         const session: Session = {
           accessToken,
           refreshToken,
-          expiresAt: parseInt(expiresAt, 10),
+          expiresAt,
         };
 
         // Save tokens
@@ -56,7 +80,7 @@ function CallbackHandler() {
         }
       } catch (err) {
         console.error('Auth callback error:', err);
-        setError('Failed to complete sign in');
+        setError(err instanceof Error ? err.message : 'Failed to complete sign in');
       }
     };
 
