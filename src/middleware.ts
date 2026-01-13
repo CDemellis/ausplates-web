@@ -81,8 +81,9 @@ export async function middleware(request: NextRequest) {
       return NextResponse.next();
     }
 
-    // Get access token from cookie
-    const accessToken = request.cookies.get('ausplates_access_token')?.value;
+    // Get access token from cookie (URL-encoded by auth.ts)
+    const rawToken = request.cookies.get('ausplates_access_token')?.value;
+    const accessToken = rawToken ? decodeURIComponent(rawToken) : undefined;
 
     // No token = not authenticated, return 404
     if (!accessToken) {
@@ -113,7 +114,9 @@ export async function middleware(request: NextRequest) {
   }
 
   // Check if user has access token (stored in cookie or localStorage)
-  const accessToken = request.cookies.get('ausplates_access_token')?.value;
+  // Cookie value is URL-encoded by auth.ts, so we need to decode it
+  const rawToken = request.cookies.get('ausplates_access_token')?.value;
+  const accessToken = rawToken ? decodeURIComponent(rawToken) : undefined;
 
   // For protected routes, redirect to signin if not authenticated
   const isProtectedRoute = PROTECTED_ROUTES.some(route =>
