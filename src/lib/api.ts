@@ -2,6 +2,111 @@ import { Listing, ListingWithSeller, AustralianState, PlateType, PlateColorSchem
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://ausplates.onrender.com';
 
+// Default timeout for API calls (15 seconds)
+const DEFAULT_TIMEOUT_MS = 15000;
+
+// Retry configuration
+const MAX_RETRIES = 3;
+const INITIAL_RETRY_DELAY_MS = 1000;
+
+/**
+ * Check if an error is transient and should be retried
+ */
+function isRetryableError(error: unknown, status?: number): boolean {
+  // Network errors
+  if (error instanceof TypeError && error.message.includes('fetch')) {
+    return true;
+  }
+  if (error instanceof Error) {
+    const message = error.message.toLowerCase();
+    if (
+      message.includes('network') ||
+      message.includes('timeout') ||
+      message.includes('abort') ||
+      message.includes('failed to fetch')
+    ) {
+      return true;
+    }
+  }
+  // HTTP status codes that should be retried
+  if (status && (status >= 500 || status === 408 || status === 429)) {
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Delay helper for retry backoff
+ */
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * Fetch with timeout and retry support
+ */
+async function fetchWithRetry(
+  url: string,
+  options: RequestInit = {},
+  config: { timeout?: number; retries?: number } = {}
+): Promise<Response> {
+  const timeout = config.timeout ?? DEFAULT_TIMEOUT_MS;
+  const maxRetries = config.retries ?? MAX_RETRIES;
+  let lastError: Error | null = null;
+  let retryDelay = INITIAL_RETRY_DELAY_MS;
+
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    // Create AbortController for timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeout);
+
+    try {
+      const response = await fetch(url, {
+        ...options,
+        signal: controller.signal,
+      });
+
+      // Don't retry on success or client errors (4xx except 408, 429)
+      if (response.ok || (response.status >= 400 && response.status < 500 && response.status !== 408 && response.status !== 429)) {
+        return response;
+      }
+
+      // Check if we should retry this server error
+      if (attempt < maxRetries && isRetryableError(null, response.status)) {
+        console.warn(`[API] Request failed with status ${response.status}, retrying (${attempt}/${maxRetries})...`);
+        await delay(retryDelay);
+        retryDelay = Math.min(retryDelay * 2, 10000); // Max 10 second delay
+        continue;
+      }
+
+      return response;
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+
+      // Check if we should retry this error
+      if (attempt < maxRetries && isRetryableError(error)) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        console.warn(`[API] Request failed: ${errorMessage}, retrying (${attempt}/${maxRetries})...`);
+        await delay(retryDelay);
+        retryDelay = Math.min(retryDelay * 2, 10000);
+        continue;
+      }
+
+      // Transform AbortError to a more user-friendly error
+      if (error instanceof Error && error.name === 'AbortError') {
+        throw new Error('Request timed out. Please check your connection and try again.');
+      }
+
+      throw error;
+    } finally {
+      clearTimeout(timeoutId);
+    }
+  }
+
+  // All retries failed
+  throw lastError || new Error('Request failed after retries');
+}
+
 // API response types (snake_case from backend)
 // Exported for use in client-side components
 export interface APIListing {
@@ -167,7 +272,7 @@ export async function getListings(params: ListingsParams = {}): Promise<{ listin
 
   const url = `${API_BASE_URL}/api/listings?${searchParams.toString()}`;
 
-  const res = await fetch(url, { cache: 'no-store' });
+  const res = await fetchWithRetry(url, { cache: 'no-store' });
 
   if (!res.ok) {
     throw new Error('Failed to fetch listings');
@@ -184,7 +289,7 @@ export async function getListings(params: ListingsParams = {}): Promise<{ listin
 export async function getFeaturedListings(): Promise<Listing[]> {
   const url = `${API_BASE_URL}/api/listings/featured`;
 
-  const res = await fetch(url, { cache: 'no-store' });
+  const res = await fetchWithRetry(url, { cache: 'no-store' });
 
   if (!res.ok) {
     throw new Error('Failed to fetch featured listings');
@@ -197,7 +302,7 @@ export async function getFeaturedListings(): Promise<Listing[]> {
 export async function getRecentListings(limit = 12): Promise<Listing[]> {
   const url = `${API_BASE_URL}/api/listings/recent?limit=${limit}`;
 
-  const res = await fetch(url, { cache: 'no-store' });
+  const res = await fetchWithRetry(url, { cache: 'no-store' });
 
   if (!res.ok) {
     throw new Error('Failed to fetch recent listings');
@@ -210,7 +315,7 @@ export async function getRecentListings(limit = 12): Promise<Listing[]> {
 export async function getListingBySlug(slug: string): Promise<ListingWithSeller | null> {
   const url = `${API_BASE_URL}/api/listings/${slug}`;
 
-  const res = await fetch(url, { cache: 'no-store' });
+  const res = await fetchWithRetry(url, { cache: 'no-store' });
 
   if (res.status === 404) {
     return null;
@@ -238,7 +343,7 @@ export async function getListingsByState(state: AustralianState, limit = 20): Pr
 export async function getStats(): Promise<{ totalListings: number; totalSold: number; totalValue: number }> {
   const url = `${API_BASE_URL}/api/stats`;
 
-  const res = await fetch(url, { next: { revalidate: 300 } });
+  const res = await fetchWithRetry(url, { next: { revalidate: 300 } } as RequestInit);
 
   if (!res.ok) {
     // Return defaults if stats endpoint doesn't exist
@@ -266,7 +371,7 @@ export async function getAllListingSlugs(): Promise<{ slug: string; updatedAt: s
 export async function getSavedListings(accessToken: string): Promise<Listing[]> {
   const url = `${API_BASE_URL}/api/users/me/saved`;
 
-  const res = await fetch(url, {
+  const res = await fetchWithRetry(url, {
     headers: {
       'Authorization': `Bearer ${accessToken}`,
       'Content-Type': 'application/json',
@@ -287,7 +392,7 @@ export async function getSavedListings(accessToken: string): Promise<Listing[]> 
 export async function saveListing(accessToken: string, listingId: string): Promise<void> {
   const url = `${API_BASE_URL}/api/listings/${listingId}/save`;
 
-  const res = await fetch(url, {
+  const res = await fetchWithRetry(url, {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${accessToken}`,
@@ -304,7 +409,7 @@ export async function saveListing(accessToken: string, listingId: string): Promi
 export async function unsaveListing(accessToken: string, listingId: string): Promise<void> {
   const url = `${API_BASE_URL}/api/listings/${listingId}/save`;
 
-  const res = await fetch(url, {
+  const res = await fetchWithRetry(url, {
     method: 'DELETE',
     headers: {
       'Authorization': `Bearer ${accessToken}`,
@@ -461,7 +566,7 @@ function transformConversationDetail(api: APIConversation): ConversationDetail {
 export async function getConversations(accessToken: string): Promise<Conversation[]> {
   const url = `${API_BASE_URL}/api/messages/conversations`;
 
-  const res = await fetch(url, {
+  const res = await fetchWithRetry(url, {
     headers: {
       'Authorization': `Bearer ${accessToken}`,
       'Content-Type': 'application/json',
@@ -480,7 +585,7 @@ export async function getConversations(accessToken: string): Promise<Conversatio
 export async function getConversation(accessToken: string, conversationId: string): Promise<ConversationDetail> {
   const url = `${API_BASE_URL}/api/messages/conversations/${conversationId}`;
 
-  const res = await fetch(url, {
+  const res = await fetchWithRetry(url, {
     headers: {
       'Authorization': `Bearer ${accessToken}`,
       'Content-Type': 'application/json',
@@ -502,7 +607,7 @@ export async function getMessages(accessToken: string, conversationId: string, s
     url += `?since=${encodeURIComponent(since)}`;
   }
 
-  const res = await fetch(url, {
+  const res = await fetchWithRetry(url, {
     headers: {
       'Authorization': `Bearer ${accessToken}`,
       'Content-Type': 'application/json',
@@ -522,7 +627,7 @@ export async function sendMessage(accessToken: string, conversationId: string, c
   // API endpoint is POST /conversations/:id (not /conversations/:id/messages)
   const url = `${API_BASE_URL}/api/messages/conversations/${conversationId}`;
 
-  const res = await fetch(url, {
+  const res = await fetchWithRetry(url, {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${accessToken}`,
@@ -544,7 +649,7 @@ export async function sendMessage(accessToken: string, conversationId: string, c
 export async function startConversation(accessToken: string, listingId: string, message: string): Promise<Conversation> {
   const url = `${API_BASE_URL}/api/messages/conversations`;
 
-  const res = await fetch(url, {
+  const res = await fetchWithRetry(url, {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${accessToken}`,
