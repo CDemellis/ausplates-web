@@ -13,7 +13,12 @@ interface PageProps {
   params: Promise<{ id: string }>;
 }
 
-const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || '');
+// Validate Stripe key exists before attempting to load
+const stripePublishableKey = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY;
+if (!stripePublishableKey) {
+  console.error('Stripe publishable key is not configured. Payment features will not work.');
+}
+const stripePromise = stripePublishableKey ? loadStripe(stripePublishableKey) : null;
 
 type BoostType = '7day' | '30day';
 
@@ -360,6 +365,25 @@ export default function BoostListingPage({ params }: PageProps) {
 
   // Show Stripe payment form
   if (clientSecret && paymentIntentId) {
+    // Check if Stripe is properly configured
+    if (!stripePromise) {
+      return (
+        <div className="min-h-screen bg-[var(--background)] flex items-center justify-center px-4">
+          <div className="text-center">
+            <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <svg className="w-8 h-8 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+            </div>
+            <h1 className="text-xl font-semibold text-[var(--text)] mb-2">Payment Unavailable</h1>
+            <p className="text-[var(--text-secondary)] mb-4">Payment processing is temporarily unavailable. Please try again later.</p>
+            <Link href="/my-listings" className="text-[var(--green)] hover:underline">
+              Back to My Listings
+            </Link>
+          </div>
+        </div>
+      );
+    }
     return (
       <div className="min-h-screen bg-[var(--background)]">
         <div className="sticky top-0 z-20 bg-white border-b border-[var(--border)]">
