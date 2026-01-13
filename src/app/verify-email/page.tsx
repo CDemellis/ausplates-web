@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useEffect, useState } from 'react';
+import { Suspense, useEffect, useState, useRef } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { verifyEmail, resendVerification } from '@/lib/auth';
@@ -16,22 +16,23 @@ function VerifyEmailContent() {
   );
   const [error, setError] = useState('');
   const [resendStatus, setResendStatus] = useState<'idle' | 'sending' | 'sent'>('idle');
+  const hasVerified = useRef(false);
 
   useEffect(() => {
-    if (token) {
-      handleVerify(token);
+    if (token && !hasVerified.current) {
+      hasVerified.current = true;
+      const doVerify = async () => {
+        try {
+          await verifyEmail(token);
+          setStatus('success');
+        } catch (err) {
+          setStatus('error');
+          setError((err as Error).message);
+        }
+      };
+      doVerify();
     }
   }, [token]);
-
-  const handleVerify = async (verifyToken: string) => {
-    try {
-      await verifyEmail(verifyToken);
-      setStatus('success');
-    } catch (err) {
-      setStatus('error');
-      setError((err as Error).message);
-    }
-  };
 
   const handleResend = async () => {
     if (!email || resendStatus === 'sending') return;
