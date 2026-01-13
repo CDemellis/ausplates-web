@@ -113,15 +113,15 @@ export async function middleware(request: NextRequest) {
     return NextResponse.rewrite(new URL('/not-found', request.url));
   }
 
-  // Check if user has access token (stored in cookie or localStorage)
-  // Cookie value is URL-encoded by auth.ts, so we need to decode it
-  const rawToken = request.cookies.get('ausplates_access_token')?.value;
-  const accessToken = rawToken ? decodeURIComponent(rawToken) : undefined;
-
   // For protected routes, redirect to signin if not authenticated
   const isProtectedRoute = PROTECTED_ROUTES.some(route =>
     pathname === route || pathname.startsWith(`${route}/`)
   );
+
+  // Check if user has access token (stored in cookie or localStorage)
+  // Cookie value is URL-encoded by auth.ts, so we need to decode it
+  const rawToken = request.cookies.get('ausplates_access_token')?.value;
+  const accessToken = rawToken ? decodeURIComponent(rawToken) : undefined;
 
   if (isProtectedRoute && !accessToken) {
     const signinUrl = new URL('/signin', request.url);

@@ -47,6 +47,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       try {
         const userData = await getCurrentUser(accessToken);
         setUser(userData);
+        // Ensure cookie is set for middleware (handles users who logged in before cookie fix)
+        if (refreshToken) {
+          saveTokens({ accessToken, refreshToken, expiresAt: 0 });
+        }
         setIsLoading(false);
       } catch {
         // Token might be expired, try refreshing
