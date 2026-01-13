@@ -284,12 +284,19 @@ export default function ChatPage() {
   useEffect(() => {
     if (!isAuthenticated || !conversationId) return;
 
+    // Track mount state to prevent state updates after unmount
+    let isMounted = true;
+
     const pollMessages = async () => {
+      // Don't poll if component is unmounted
+      if (!isMounted) return;
+
       try {
         const token = await getAccessToken();
-        if (token && lastMessageTimeRef.current) {
+        if (token && lastMessageTimeRef.current && isMounted) {
           const newMessages = await getMessages(token, conversationId, lastMessageTimeRef.current);
-          if (newMessages.length > 0) {
+          // Check mount state again after async operation
+          if (newMessages.length > 0 && isMounted) {
             setMessages((prev) => [...prev, ...newMessages]);
             lastMessageTimeRef.current = newMessages[newMessages.length - 1].createdAt;
 
@@ -299,12 +306,17 @@ export default function ChatPage() {
         }
       } catch (err) {
         // Silently fail polling errors
-        console.error('Polling error:', err);
+        if (isMounted) {
+          console.error('Polling error:', err);
+        }
       }
     };
 
     const interval = setInterval(pollMessages, 3000);
-    return () => clearInterval(interval);
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
   }, [isAuthenticated, conversationId, getAccessToken]);
 
   // Scroll to bottom when messages change
