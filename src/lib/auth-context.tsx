@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useEffect, useState, useCallback, ReactNode } from 'react';
+import { createContext, useContext, useEffect, useState, useRef, ReactNode } from 'react';
 import {
   User,
   Session,
@@ -29,43 +29,50 @@ const AuthContext = createContext<AuthContextType | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-
-  const checkAuth = useCallback(async () => {
-    const { accessToken, refreshToken } = getTokens();
-
-    if (!accessToken) {
-      setIsLoading(false);
-      return;
-    }
-
-    try {
-      const userData = await getCurrentUser(accessToken);
-      setUser(userData);
-    } catch {
-      // Token might be expired, try refreshing
-      if (refreshToken) {
-        try {
-          const { session } = await refreshSession(refreshToken);
-          saveTokens(session);
-          const userData = await getCurrentUser(session.accessToken);
-          setUser(userData);
-        } catch {
-          // Refresh failed, clear tokens
-          clearTokens();
-          setUser(null);
-        }
-      } else {
-        clearTokens();
-        setUser(null);
-      }
-    }
-
-    setIsLoading(false);
-  }, []);
+  const hasCheckedAuth = useRef(false);
 
   useEffect(() => {
-    checkAuth();
-  }, [checkAuth]);
+    // Prevent double-checking in development mode (strict mode)
+    if (hasCheckedAuth.current) return;
+    hasCheckedAuth.current = true;
+
+    const initAuth = async () => {
+      const { accessToken, refreshToken } = getTokens();
+
+      if (!accessToken) {
+        setIsLoading(false);
+        return;
+      }
+
+      try {
+        const userData = await getCurrentUser(accessToken);
+        setUser(userData);
+        setIsLoading(false);
+      } catch {
+        // Token might be expired, try refreshing
+        if (refreshToken) {
+          try {
+            const { session } = await refreshSession(refreshToken);
+            saveTokens(session);
+            const userData = await getCurrentUser(session.accessToken);
+            setUser(userData);
+            setIsLoading(false);
+          } catch {
+            // Refresh failed, clear tokens
+            clearTokens();
+            setUser(null);
+            setIsLoading(false);
+          }
+        } else {
+          clearTokens();
+          setUser(null);
+          setIsLoading(false);
+        }
+      }
+    };
+
+    initAuth();
+  }, []);
 
   const signIn = async (email: string, password: string) => {
     const response = await apiSignIn(email, password);
