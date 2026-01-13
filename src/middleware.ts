@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
+import { jwtVerify } from 'jose';
 
 // Routes that require authentication (main site)
 const PROTECTED_ROUTES = [
@@ -21,9 +22,39 @@ const AUTH_ROUTES = [
 // This must match the list in src/app/ap-admin/layout.tsx
 const ADMIN_EMAILS = ['hello@ausplates.app'];
 
-// Decode JWT payload without verification (verification happens API-side)
-// This is safe for authorization checks as the token is validated on API calls
-function decodeJwtPayload(token: string): { email?: string; sub?: string } | null {
+// Get the JWT secret for verification
+// Must be set to the Supabase JWT secret in production
+const JWT_SECRET = process.env.SUPABASE_JWT_SECRET;
+
+/**
+ * Verify JWT signature and decode payload.
+ * Returns null if verification fails or token is invalid.
+ */
+async function verifyJwtAndGetPayload(token: string): Promise<{ email?: string; sub?: string } | null> {
+  // If no secret configured, fail closed (deny access)
+  if (!JWT_SECRET) {
+    console.error('SUPABASE_JWT_SECRET not configured - JWT verification disabled');
+    return null;
+  }
+
+  try {
+    const secret = new TextEncoder().encode(JWT_SECRET);
+    const { payload } = await jwtVerify(token, secret, {
+      algorithms: ['HS256'],
+    });
+    return payload as { email?: string; sub?: string };
+  } catch (error) {
+    // JWT verification failed (invalid signature, expired, etc.)
+    return null;
+  }
+}
+
+/**
+ * Decode JWT payload WITHOUT verification.
+ * ONLY use this for non-security-critical checks (e.g., redirect optimization).
+ * For security decisions, use verifyJwtAndGetPayload instead.
+ */
+function decodeJwtPayloadUnsafe(token: string): { email?: string; sub?: string } | null {
   try {
     const parts = token.split('.');
     if (parts.length !== 3) return null;
@@ -36,14 +67,14 @@ function decodeJwtPayload(token: string): { email?: string; sub?: string } | nul
   }
 }
 
-export function middleware(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   const hostname = request.headers.get('host') || '';
   const { pathname } = request.nextUrl;
 
   // Check if this is the admin subdomain
   const isAdminSubdomain = hostname.startsWith('admin.') || hostname === 'admin.localhost:3000';
 
-  // Admin subdomain: verify admin access server-side
+  // Admin subdomain: verify admin access server-side with proper JWT verification
   if (isAdminSubdomain) {
     // Don't verify for Next.js internal routes
     if (pathname.startsWith('/_next')) {
@@ -58,14 +89,15 @@ export function middleware(request: NextRequest) {
       return NextResponse.rewrite(new URL('/not-found', request.url));
     }
 
-    // Decode JWT to check admin email
-    const payload = decodeJwtPayload(accessToken);
+    // SECURITY: Verify JWT signature before trusting claims
+    // This prevents attackers from forging JWTs with admin emails
+    const payload = await verifyJwtAndGetPayload(accessToken);
     if (!payload?.email || !ADMIN_EMAILS.includes(payload.email)) {
-      // Not an admin - return 404 (don't reveal admin panel exists)
+      // JWT invalid/forged or not an admin - return 404 (don't reveal admin panel exists)
       return NextResponse.rewrite(new URL('/not-found', request.url));
     }
 
-    // Admin verified - rewrite to admin routes if needed
+    // Admin verified with valid JWT signature - rewrite to admin routes if needed
     if (!pathname.startsWith('/ap-admin')) {
       const url = request.nextUrl.clone();
       url.pathname = `/ap-admin${pathname}`;
