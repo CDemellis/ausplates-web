@@ -1,6 +1,7 @@
 'use client';
 
 import { Component, ReactNode } from 'react';
+import Link from 'next/link';
 
 interface ErrorBoundaryProps {
   children: ReactNode;
@@ -73,12 +74,12 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
               >
                 Try Again
               </button>
-              <a
+              <Link
                 href="/"
                 className="px-6 py-3 border border-[var(--border)] text-[var(--text)] font-medium rounded-xl hover:bg-[var(--background-subtle)] transition-colors"
               >
                 Go Home
-              </a>
+              </Link>
             </div>
             {process.env.NODE_ENV === 'development' && this.state.error && (
               <details className="mt-6 text-left p-4 bg-gray-100 rounded-lg">
