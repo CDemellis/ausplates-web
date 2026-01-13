@@ -9,6 +9,54 @@ import { QRLogin } from '@/components/QRLogin';
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://ausplates.onrender.com';
 const APPLE_SERVICES_ID = 'app.ausplates.web';
 
+// Allowed domains for redirect URLs (prevents open redirect attacks)
+const ALLOWED_REDIRECT_DOMAINS = [
+  'ausplates.app',
+  'www.ausplates.app',
+  'admin.ausplates.app',
+];
+
+/**
+ * Validates and sanitizes a redirect URL to prevent open redirect attacks.
+ * Only allows relative paths or URLs to allowed domains.
+ */
+function getSafeRedirectUrl(redirectParam: string | null): string {
+  // Default to home if no redirect specified
+  if (!redirectParam) return '/';
+
+  // Allow relative paths (must start with /)
+  if (redirectParam.startsWith('/') && !redirectParam.startsWith('//')) {
+    // Ensure it's a clean relative path (no protocol injection)
+    try {
+      const url = new URL(redirectParam, 'https://ausplates.app');
+      // Return just the pathname + search + hash (strips any potential host manipulation)
+      return url.pathname + url.search + url.hash;
+    } catch {
+      return '/';
+    }
+  }
+
+  // For absolute URLs, validate the domain
+  try {
+    const url = new URL(redirectParam);
+    const hostname = url.hostname.toLowerCase();
+
+    // Check if hostname matches allowed domains
+    const isAllowedDomain = ALLOWED_REDIRECT_DOMAINS.some(domain =>
+      hostname === domain || hostname.endsWith('.' + domain)
+    );
+
+    if (isAllowedDomain && (url.protocol === 'https:' || url.protocol === 'http:')) {
+      return redirectParam;
+    }
+  } catch {
+    // Invalid URL
+  }
+
+  // Default to home for invalid/disallowed URLs
+  return '/';
+}
+
 type SignInMethod = 'credentials' | 'qr';
 
 function getAppleSignInUrl(): string {
@@ -74,16 +122,19 @@ function SignInForm() {
   const [isLoading, setIsLoading] = useState(false);
   const [showResendVerification, setShowResendVerification] = useState(false);
 
-  const redirect = searchParams.get('redirect') || '/';
+  // Validate redirect URL to prevent open redirect attacks
+  const redirect = getSafeRedirectUrl(searchParams.get('redirect'));
 
   const hasRedirected = useRef(false);
 
-  // Helper to handle redirect (supports both relative paths and full URLs)
+  // Helper to handle redirect (supports both relative paths and allowed full URLs)
   const doRedirect = useCallback((url: string) => {
-    if (url.startsWith('http://') || url.startsWith('https://')) {
-      window.location.href = url;
+    // Re-validate before redirecting (defense in depth)
+    const safeUrl = getSafeRedirectUrl(url);
+    if (safeUrl.startsWith('http://') || safeUrl.startsWith('https://')) {
+      window.location.href = safeUrl;
     } else {
-      router.push(url);
+      router.push(safeUrl);
     }
   }, [router]);
 
@@ -120,7 +171,7 @@ function SignInForm() {
   if (method === 'qr') {
     return (
       <div className="space-y-6">
-        <QRLogin onSuccess={() => window.location.href = redirect} />
+        <QRLogin onSuccess={() => doRedirect(redirect)} />
 
         {/* Back to credentials */}
         <div className="text-center">
