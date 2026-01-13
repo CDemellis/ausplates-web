@@ -17,6 +17,25 @@ const AUTH_ROUTES = [
   '/signup',
 ];
 
+// Admin emails that are allowed to access the admin panel
+// This must match the list in src/app/ap-admin/layout.tsx
+const ADMIN_EMAILS = ['hello@ausplates.app'];
+
+// Decode JWT payload without verification (verification happens API-side)
+// This is safe for authorization checks as the token is validated on API calls
+function decodeJwtPayload(token: string): { email?: string; sub?: string } | null {
+  try {
+    const parts = token.split('.');
+    if (parts.length !== 3) return null;
+    const payload = parts[1];
+    // Base64url decode
+    const decoded = atob(payload.replace(/-/g, '+').replace(/_/g, '/'));
+    return JSON.parse(decoded);
+  } catch {
+    return null;
+  }
+}
+
 export function middleware(request: NextRequest) {
   const hostname = request.headers.get('host') || '';
   const { pathname } = request.nextUrl;
@@ -24,17 +43,36 @@ export function middleware(request: NextRequest) {
   // Check if this is the admin subdomain
   const isAdminSubdomain = hostname.startsWith('admin.') || hostname === 'admin.localhost:3000';
 
-  // Admin subdomain: rewrite all requests to /ap-admin prefix
+  // Admin subdomain: verify admin access server-side
   if (isAdminSubdomain) {
-    // Don't rewrite if already has the prefix or is a Next.js internal route
-    if (pathname.startsWith('/ap-admin') || pathname.startsWith('/_next')) {
+    // Don't verify for Next.js internal routes
+    if (pathname.startsWith('/_next')) {
       return NextResponse.next();
     }
 
-    // Rewrite to admin routes
-    const url = request.nextUrl.clone();
-    url.pathname = `/ap-admin${pathname}`;
-    return NextResponse.rewrite(url);
+    // Get access token from cookie
+    const accessToken = request.cookies.get('ausplates_access_token')?.value;
+
+    // No token = not authenticated, return 404
+    if (!accessToken) {
+      return NextResponse.rewrite(new URL('/not-found', request.url));
+    }
+
+    // Decode JWT to check admin email
+    const payload = decodeJwtPayload(accessToken);
+    if (!payload?.email || !ADMIN_EMAILS.includes(payload.email)) {
+      // Not an admin - return 404 (don't reveal admin panel exists)
+      return NextResponse.rewrite(new URL('/not-found', request.url));
+    }
+
+    // Admin verified - rewrite to admin routes if needed
+    if (!pathname.startsWith('/ap-admin')) {
+      const url = request.nextUrl.clone();
+      url.pathname = `/ap-admin${pathname}`;
+      return NextResponse.rewrite(url);
+    }
+
+    return NextResponse.next();
   }
 
   // Main domain: block access to admin routes
