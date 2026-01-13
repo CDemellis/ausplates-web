@@ -1,10 +1,10 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/lib/auth-context';
-import { getAdminStatus, AdminStatus } from '@/lib/admin';
+import { getAdminStatus } from '@/lib/admin';
 
 const ADMIN_EMAILS = ['hello@ausplates.app'];
 
@@ -15,79 +15,82 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const router = useRouter();
   const pathname = usePathname();
   const { user, isLoading: authLoading, getAccessToken, signOut } = useAuth();
-  const [adminStatus, setAdminStatus] = useState<AdminStatus | null>(null);
   const [isCheckingAdmin, setIsCheckingAdmin] = useState(true);
   const [showNotFound, setShowNotFound] = useState(false);
+  const hasCheckedAccess = useRef(false);
+  const lastPathname = useRef(pathname);
 
   useEffect(() => {
-    checkAdminAccess();
-  }, [user, authLoading, pathname]);
-
-  const checkAdminAccess = async () => {
-    // Still loading auth state
-    if (authLoading) return;
-
-    // Not authenticated - redirect to signin on main domain
-    if (!user) {
-      // Use window.location for cross-domain redirect
-      if (typeof window !== 'undefined') {
-        window.location.href = 'https://ausplates.app/signin?redirect=' + encodeURIComponent('https://admin.ausplates.app/');
-      }
-      return;
+    // Reset check if pathname changed
+    if (lastPathname.current !== pathname) {
+      lastPathname.current = pathname;
+      hasCheckedAccess.current = false;
     }
 
-    // Check if user email is in admin list
-    if (!ADMIN_EMAILS.includes(user.email)) {
-      // Show 404 to non-admins (don't reveal admin exists)
-      setShowNotFound(true);
-      setIsCheckingAdmin(false);
-      return;
-    }
+    // Skip if already checked or still loading
+    if (hasCheckedAccess.current || authLoading) return;
 
-    // User is admin, check 2FA status
-    try {
-      const token = await getAccessToken();
-      if (!token) {
+    const checkAdminAccess = async () => {
+      hasCheckedAccess.current = true;
+
+      // Not authenticated - redirect to signin on main domain
+      if (!user) {
         if (typeof window !== 'undefined') {
           window.location.href = 'https://ausplates.app/signin?redirect=' + encodeURIComponent('https://admin.ausplates.app/');
         }
         return;
       }
 
-      const status = await getAdminStatus(token);
-      setAdminStatus(status);
-
-      // Check if 2FA is enabled
-      if (!status.totpEnabled) {
-        // Redirect to 2FA setup if not on setup page
-        if (!pathname.startsWith('/2fa/setup')) {
-          router.push('/2fa/setup');
-          return;
-        }
-      } else {
-        // Check if 2FA session is valid
-        const twoFaVerifiedAt = localStorage.getItem('admin_2fa_verified_at');
-        const isSessionValid = twoFaVerifiedAt &&
-          (Date.now() - parseInt(twoFaVerifiedAt, 10)) < TWO_FA_SESSION_DURATION_MS;
-
-        if (!isSessionValid) {
-          // Redirect to 2FA verify if not on verify page
-          if (!pathname.startsWith('/2fa/verify')) {
-            // Store intended destination
-            sessionStorage.setItem('admin_redirect_after_2fa', pathname);
-            router.push('/2fa/verify');
-            return;
-          }
-        }
+      // Check if user email is in admin list
+      if (!ADMIN_EMAILS.includes(user.email)) {
+        setShowNotFound(true);
+        setIsCheckingAdmin(false);
+        return;
       }
 
-      setIsCheckingAdmin(false);
-    } catch (error) {
-      console.error('Failed to check admin status:', error);
-      setShowNotFound(true);
-      setIsCheckingAdmin(false);
-    }
-  };
+      // User is admin, check 2FA status
+      try {
+        const token = await getAccessToken();
+        if (!token) {
+          if (typeof window !== 'undefined') {
+            window.location.href = 'https://ausplates.app/signin?redirect=' + encodeURIComponent('https://admin.ausplates.app/');
+          }
+          return;
+        }
+
+        const status = await getAdminStatus(token);
+
+        // Check if 2FA is enabled
+        if (!status.totpEnabled) {
+          if (!pathname.startsWith('/2fa/setup')) {
+            router.push('/2fa/setup');
+            return;
+          }
+        } else {
+          // Check if 2FA session is valid
+          const twoFaVerifiedAt = localStorage.getItem('admin_2fa_verified_at');
+          const isSessionValid = twoFaVerifiedAt &&
+            (Date.now() - parseInt(twoFaVerifiedAt, 10)) < TWO_FA_SESSION_DURATION_MS;
+
+          if (!isSessionValid) {
+            if (!pathname.startsWith('/2fa/verify')) {
+              sessionStorage.setItem('admin_redirect_after_2fa', pathname);
+              router.push('/2fa/verify');
+              return;
+            }
+          }
+        }
+
+        setIsCheckingAdmin(false);
+      } catch (error) {
+        console.error('Failed to check admin status:', error);
+        setShowNotFound(true);
+        setIsCheckingAdmin(false);
+      }
+    };
+
+    checkAdminAccess();
+  }, [authLoading, user, getAccessToken, pathname, router]);
 
   const handleSignOut = async () => {
     localStorage.removeItem('admin_2fa_verified_at');
