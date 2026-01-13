@@ -1103,7 +1103,7 @@ export async function getUserListings(
   const response = await res.json();
   // API returns paginated format: { data: [...], count, hasMore }
   const listings = response.data || response;
-  return listings.map((listing: any) => ({
+  return listings.map((listing: Record<string, unknown>) => ({
     id: listing.id,
     combination: listing.combination,
     state: listing.state,
@@ -1143,7 +1143,7 @@ export interface UpdateListingResult {
   listing?: {
     id: string;
     status: string;
-    [key: string]: any;
+    [key: string]: unknown;
   };
 }
 
@@ -1154,7 +1154,7 @@ export async function updateListing(
 ): Promise<UpdateListingResult> {
   const url = `${API_BASE_URL}/api/listings/${listingId}`;
 
-  const apiData: Record<string, any> = {};
+  const apiData: Record<string, unknown> = {};
   if (data.combination !== undefined) apiData.combination = data.combination;
   if (data.state !== undefined) apiData.state = data.state;
   if (data.plateType !== undefined) apiData.plate_type = data.plateType;
