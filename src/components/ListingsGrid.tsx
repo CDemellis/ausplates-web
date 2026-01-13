@@ -3,6 +3,7 @@
 import { useState, useCallback } from 'react';
 import { ListingCard } from './ListingCard';
 import { Listing, AustralianState, PlateType, PlateColorScheme, PlateSizeFormat } from '@/types/listing';
+import { transformListing, APIListing } from '@/lib/api';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://ausplates.onrender.com';
 
@@ -65,7 +66,7 @@ export function ListingsGrid({
       }
 
       const data = await res.json();
-      const newListings = (data.data || []).map(transformListing);
+      const newListings = (data.data || []).map((item: APIListing) => transformListing(item));
 
       setListings(prev => [...prev, ...newListings]);
     } catch (err) {
@@ -126,31 +127,4 @@ export function ListingsGrid({
       </div>
     </div>
   );
-}
-
-// Transform API response to frontend format (duplicated from api.ts for client-side use)
-function transformListing(api: any): Listing {
-  const photoUrlsFromColumn = api.photo_urls || [];
-  const photoUrlsFromTable = (api.photos || []).map((p: any) => p.url);
-  const allPhotoUrls = [...new Set([...photoUrlsFromColumn, ...photoUrlsFromTable])];
-
-  return {
-    id: api.id,
-    slug: api.slug,
-    combination: api.combination,
-    state: api.state,
-    plateType: api.plate_type,
-    price: api.price,
-    description: api.description,
-    isOpenToOffers: api.is_open_to_offers,
-    isFeatured: api.is_featured,
-    status: api.status,
-    viewsCount: api.views_count,
-    sellerId: api.user_id,
-    colorScheme: api.color_scheme,
-    sizeFormats: api.size_formats || [],
-    photoUrls: allPhotoUrls,
-    createdAt: api.created_at,
-    updatedAt: api.updated_at,
-  };
 }

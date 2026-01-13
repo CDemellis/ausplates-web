@@ -3,7 +3,8 @@ import { Listing, ListingWithSeller, AustralianState, PlateType, PlateColorSchem
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://ausplates.onrender.com';
 
 // API response types (snake_case from backend)
-interface APIListing {
+// Exported for use in client-side components
+export interface APIListing {
   id: string;
   slug: string;
   combination: string;
@@ -49,7 +50,8 @@ interface APIListingsResponse {
 }
 
 // Transform API response to frontend format
-function transformListing(api: APIListing): Listing {
+// Exported for use in client-side components
+export function transformListing(api: APIListing): Listing {
   // Merge photos from both sources:
   // 1. photo_urls column (web uploads)
   // 2. photos from listing_photos table (iOS app uploads)
