@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { getTokens, getLinkingStatus, linkEmail, LinkingStatus, deleteAccount, clearTokens, changePassword } from '@/lib/auth';
-import { getSavedListings, getUserProfile, updateUserProfile, uploadPhoto, UserProfile, UpdateProfileData } from '@/lib/api';
+import { getSavedListings, getUserProfile, updateUserProfile, uploadPhoto, UserProfile, UpdateProfileData, exportUserData } from '@/lib/api';
 import { Listing } from '@/types/listing';
 import { ListingCard, ListingCardSkeleton } from '@/components/ListingCard';
 
@@ -956,6 +956,105 @@ function ChangePasswordSection() {
   );
 }
 
+function DownloadIcon() {
+  return (
+    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+    </svg>
+  );
+}
+
+function ExportDataSection() {
+  const [isExporting, setIsExporting] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+
+  const handleExport = async () => {
+    setError('');
+    setSuccess('');
+
+    const { accessToken } = getTokens();
+    if (!accessToken) {
+      setError('You must be signed in to export data');
+      return;
+    }
+
+    setIsExporting(true);
+    try {
+      const data = await exportUserData(accessToken);
+
+      // Create and download the JSON file
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `ausplates-data-export-${new Date().toISOString().split('T')[0]}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      setSuccess('Your data has been exported successfully');
+    } catch (err) {
+      setError((err as Error).message || 'Failed to export data');
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  return (
+    <div className="bg-white rounded-2xl border border-[var(--border)] overflow-hidden">
+      <div className="px-6 py-4 border-b border-[var(--border)]">
+        <h2 className="text-lg font-semibold text-[var(--text)]">Your Data</h2>
+        <p className="text-sm text-[var(--text-muted)] mt-1">
+          Download a copy of all your data
+        </p>
+      </div>
+
+      <div className="p-6">
+        {error && (
+          <div className="bg-red-50 text-red-600 px-4 py-3 rounded-xl text-sm mb-4">
+            {error}
+          </div>
+        )}
+
+        {success && (
+          <div className="bg-green-50 text-green-600 px-4 py-3 rounded-xl text-sm flex items-center gap-2 mb-4">
+            <CheckIcon />
+            {success}
+          </div>
+        )}
+
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="font-medium text-[var(--text)]">Export My Data</h3>
+            <p className="text-sm text-[var(--text-muted)] mt-1">
+              Download a JSON file containing your profile, listings, messages, and more
+            </p>
+          </div>
+          <button
+            onClick={handleExport}
+            disabled={isExporting}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--green)] text-white font-medium hover:bg-[#006B31] transition-colors disabled:opacity-50"
+          >
+            {isExporting ? (
+              <>
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                Exporting...
+              </>
+            ) : (
+              <>
+                <DownloadIcon />
+                Export Data
+              </>
+            )}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function DeleteAccountSection({ onDelete }: { onDelete: () => void }) {
   const [showConfirm, setShowConfirm] = useState(false);
   const [confirmText, setConfirmText] = useState('');
@@ -1138,6 +1237,9 @@ export default function ProfilePage() {
 
         {/* Change Password */}
         <ChangePasswordSection />
+
+        {/* Export Data */}
+        <ExportDataSection />
 
         {/* Sign Out */}
         <div className="bg-white rounded-2xl border border-[var(--border)] p-6">

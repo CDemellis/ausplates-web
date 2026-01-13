@@ -1939,3 +1939,41 @@ export async function getCampaigns(accessToken: string): Promise<string[]> {
   const data = await res.json();
   return data.campaigns || [];
 }
+
+// ============================================
+// GDPR DATA EXPORT API
+// ============================================
+
+export interface UserDataExport {
+  exportedAt: string;
+  exportVersion: string;
+  profile: Record<string, unknown>;
+  listings: Record<string, unknown>[];
+  savedListings: Record<string, unknown>[];
+  conversations: Record<string, unknown>[];
+  messagesSent: Record<string, unknown>[];
+  notifications: Record<string, unknown>[];
+  transactions: Record<string, unknown>[];
+  reportsMade: Record<string, unknown>[];
+  deviceTokens: Record<string, unknown>[];
+  dataRetentionNote: string;
+}
+
+// Export all user data (GDPR compliance)
+export async function exportUserData(accessToken: string): Promise<UserDataExport> {
+  const url = `${API_BASE_URL}/api/users/me/export`;
+
+  const res = await fetch(url, {
+    headers: {
+      'Authorization': `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+  });
+
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.error || 'Failed to export user data');
+  }
+
+  return res.json();
+}
