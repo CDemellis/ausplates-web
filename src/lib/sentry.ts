@@ -34,15 +34,33 @@ interface ErrorContext {
 const SENTRY_DSN = process.env.NEXT_PUBLIC_SENTRY_DSN;
 const IS_SENTRY_ENABLED = Boolean(SENTRY_DSN);
 
-// Lazy-loaded Sentry module
-let sentryModule: typeof import('@sentry/nextjs') | null = null;
+// Sentry-compatible interface for dynamic loading
+interface SentryModule {
+  withScope: (callback: (scope: SentryScope) => string | undefined) => string | undefined;
+  captureException: (error: Error | unknown) => string;
+  captureMessage: (message: string, level?: SeverityLevel) => string;
+  setUser: (user: SentryUser | null) => void;
+  addBreadcrumb: (breadcrumb: {
+    category?: string;
+    message: string;
+    level?: SeverityLevel;
+    data?: Record<string, unknown>;
+  }) => void;
+}
 
-async function getSentry() {
+// Lazy-loaded Sentry module
+let sentryModule: SentryModule | null = null;
+
+async function getSentry(): Promise<SentryModule | null> {
   if (!IS_SENTRY_ENABLED) return null;
 
   if (!sentryModule) {
     try {
-      sentryModule = await import('@sentry/nextjs');
+      // Dynamic import with string literal to avoid TypeScript module resolution
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const moduleName = '@sentry/nextjs';
+      const module = await (Function(`return import("${moduleName}")`)() as Promise<SentryModule>);
+      sentryModule = module;
     } catch {
       console.warn('Sentry module not installed. Run: npm install @sentry/nextjs');
       return null;
