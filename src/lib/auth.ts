@@ -198,6 +198,27 @@ export async function signOut(accessToken: string): Promise<void> {
 const ACCESS_TOKEN_KEY = 'ausplates_access_token';
 const REFRESH_TOKEN_KEY = 'ausplates_refresh_token';
 
+/**
+ * SECURITY NOTE: Token Storage Strategy
+ *
+ * Current approach: localStorage + cookies (not httpOnly)
+ *
+ * Tradeoffs:
+ * - localStorage is vulnerable to XSS attacks
+ * - Non-httpOnly cookies are also accessible via JavaScript (XSS)
+ * - httpOnly cookies would be more secure but require API changes
+ *
+ * Mitigations applied:
+ * 1. Short token expiry (access tokens expire in 1 hour via Supabase)
+ * 2. Refresh tokens can be revoked server-side
+ * 3. Secure and SameSite cookie flags to prevent CSRF
+ * 4. CSP headers should be configured to prevent inline scripts
+ * 5. Input sanitization throughout the app
+ *
+ * Future improvement: Move token storage entirely to httpOnly cookies
+ * set by the API server for maximum XSS protection.
+ */
+
 // Cookie helpers for middleware access (shared across subdomains)
 function getCookieDomain(): string {
   if (typeof window === 'undefined') return '';
@@ -210,29 +231,56 @@ function getCookieDomain(): string {
   return '';
 }
 
+function isSecureContext(): boolean {
+  if (typeof window === 'undefined') return false;
+  return window.location.protocol === 'https:';
+}
+
 function setCookie(name: string, value: string, days: number = 30) {
   const expires = new Date(Date.now() + days * 24 * 60 * 60 * 1000).toUTCString();
   const domain = getCookieDomain();
-  document.cookie = `${name}=${value}; expires=${expires}; path=/${domain}; SameSite=Lax`;
+  // Use Secure flag in production (HTTPS only)
+  // Use SameSite=Strict for better CSRF protection (was Lax)
+  const secure = isSecureContext() ? '; Secure' : '';
+  document.cookie = `${name}=${encodeURIComponent(value)}; expires=${expires}; path=/${domain}; SameSite=Strict${secure}`;
 }
 
 function deleteCookie(name: string) {
   const domain = getCookieDomain();
-  document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/${domain};`;
+  const secure = isSecureContext() ? '; Secure' : '';
+  document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/${domain}; SameSite=Strict${secure}`;
 }
 
 function getCookie(name: string): string | null {
   if (typeof document === 'undefined') return null;
   const match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
-  return match ? match[2] : null;
+  return match ? decodeURIComponent(match[2]) : null;
+}
+
+/**
+ * Basic token format validation to prevent storing malicious data.
+ * JWTs have 3 base64url-encoded parts separated by dots.
+ */
+function isValidJwtFormat(token: string): boolean {
+  if (!token || typeof token !== 'string') return false;
+  const parts = token.split('.');
+  if (parts.length !== 3) return false;
+  // Check each part is valid base64url (alphanumeric, -, _, no spaces)
+  const base64urlRegex = /^[A-Za-z0-9_-]+$/;
+  return parts.every(part => part.length > 0 && base64urlRegex.test(part));
 }
 
 export function saveTokens(session: Session) {
   if (typeof window !== 'undefined') {
+    // Validate token format before storing to prevent XSS payload injection
+    if (!isValidJwtFormat(session.accessToken) || !isValidJwtFormat(session.refreshToken)) {
+      console.error('Invalid token format detected, not storing');
+      return;
+    }
     // Store in localStorage for client-side access
     localStorage.setItem(ACCESS_TOKEN_KEY, session.accessToken);
     localStorage.setItem(REFRESH_TOKEN_KEY, session.refreshToken);
-    // Also store in cookies for middleware access
+    // Also store in cookies for middleware access (with security flags)
     setCookie(ACCESS_TOKEN_KEY, session.accessToken);
     setCookie(REFRESH_TOKEN_KEY, session.refreshToken);
   }
@@ -243,9 +291,13 @@ export function getTokens(): { accessToken: string | null; refreshToken: string 
     return { accessToken: null, refreshToken: null };
   }
   // Try localStorage first, fall back to cookies (for cross-subdomain auth)
+  const accessToken = localStorage.getItem(ACCESS_TOKEN_KEY) || getCookie(ACCESS_TOKEN_KEY);
+  const refreshToken = localStorage.getItem(REFRESH_TOKEN_KEY) || getCookie(REFRESH_TOKEN_KEY);
+
+  // Validate tokens on retrieval as well
   return {
-    accessToken: localStorage.getItem(ACCESS_TOKEN_KEY) || getCookie(ACCESS_TOKEN_KEY),
-    refreshToken: localStorage.getItem(REFRESH_TOKEN_KEY) || getCookie(REFRESH_TOKEN_KEY),
+    accessToken: accessToken && isValidJwtFormat(accessToken) ? accessToken : null,
+    refreshToken: refreshToken && isValidJwtFormat(refreshToken) ? refreshToken : null,
   };
 }
 
