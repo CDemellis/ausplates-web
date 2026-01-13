@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useEffect, useState } from 'react';
+import { Suspense, useEffect, useState, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 
@@ -70,26 +70,35 @@ function SuccessContent() {
   // Payment complete flow from embedded checkout
   const paymentComplete = searchParams.get('payment') === 'complete';
 
-  const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
-  const [tier, setTier] = useState<BoostType>('none');
-
-  useEffect(() => {
-    if (!paymentComplete) {
-      setStatus('error');
-      return;
-    }
-
-    // Read tier from draft before clearing
+  // Initialize status based on paymentComplete synchronously
+  const [status, setStatus] = useState<'loading' | 'success' | 'error'>(
+    paymentComplete ? 'loading' : 'error'
+  );
+  // Lazy initialization for tier - read from localStorage
+  const [tier] = useState<BoostType>(() => {
+    if (typeof window === 'undefined') return 'none';
     try {
       const saved = localStorage.getItem('ausplates_listing_draft');
       if (saved) {
         const draft = JSON.parse(saved);
         if (draft.boostType && ['none', '7day', '30day'].includes(draft.boostType)) {
-          setTier(draft.boostType);
+          return draft.boostType;
         }
       }
     } catch {
       // Ignore parse errors
+    }
+    return 'none';
+  });
+  const hasInitialized = useRef(false);
+
+  useEffect(() => {
+    if (hasInitialized.current) return;
+    hasInitialized.current = true;
+
+    // If no payment complete flag, status is already set to error
+    if (!paymentComplete) {
+      return;
     }
 
     // Clear the draft
