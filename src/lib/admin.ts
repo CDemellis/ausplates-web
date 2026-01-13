@@ -91,6 +91,12 @@ export async function verify2FA(accessToken: string, code: string): Promise<Totp
   return data;
 }
 
+// Error type for 2FA validation that includes lockout info from server
+export interface TwoFAValidationError extends Error {
+  lockedUntil?: number;
+  isLocked?: boolean;
+}
+
 // Validate 2FA code (session re-verification)
 export async function validate2FA(accessToken: string, code: string): Promise<TotpVerifyResponse> {
   const res = await fetch(`${API_BASE_URL}/api/admin/2fa/validate`, {
@@ -105,7 +111,13 @@ export async function validate2FA(accessToken: string, code: string): Promise<To
   const data = await res.json();
 
   if (!res.ok) {
-    throw new Error(data.error || 'Invalid verification code');
+    // Check if server returned lockout info (429 status)
+    const error = new Error(data.error || 'Invalid verification code') as TwoFAValidationError;
+    if (res.status === 429 && data.locked_until) {
+      error.isLocked = true;
+      error.lockedUntil = data.locked_until;
+    }
+    throw error;
   }
 
   return data;

@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
-import { validate2FA } from '@/lib/admin';
+import { validate2FA, TwoFAValidationError } from '@/lib/admin';
 
 const MAX_ATTEMPTS = 5;
 const LOCKOUT_DURATION_MS = 15 * 60 * 1000; // 15 minutes
@@ -18,7 +18,8 @@ export default function TwoFactorVerifyPage() {
   const [lockoutUntil, setLockoutUntil] = useState<number | null>(null);
   const [lockoutRemaining, setLockoutRemaining] = useState(0);
 
-  // Check for existing lockout on mount
+  // Check for existing lockout on mount (localStorage is backup display only)
+  // Server-side lockout is the source of truth and will be synced on validation attempts
   useEffect(() => {
     const storedLockout = localStorage.getItem('admin_2fa_lockout_until');
     if (storedLockout) {
@@ -92,6 +93,20 @@ export default function TwoFactorVerifyPage() {
       sessionStorage.removeItem('admin_redirect_after_2fa');
       router.push(redirectTo);
     } catch (err) {
+      const validationError = err as TwoFAValidationError;
+
+      // Check if server returned lockout info (source of truth)
+      if (validationError.isLocked && validationError.lockedUntil) {
+        // Sync lockout state from server - convert seconds to milliseconds
+        const serverLockoutMs = validationError.lockedUntil * 1000;
+        setLockoutUntil(serverLockoutMs);
+        localStorage.setItem('admin_2fa_lockout_until', serverLockoutMs.toString());
+        setError('Too many failed attempts. Please try again later.');
+        setCode('');
+        return;
+      }
+
+      // Increment local attempts as backup (server is source of truth)
       const newAttempts = attempts + 1;
       setAttempts(newAttempts);
       localStorage.setItem('admin_2fa_attempts', newAttempts.toString());
@@ -102,7 +117,7 @@ export default function TwoFactorVerifyPage() {
         localStorage.setItem('admin_2fa_lockout_until', lockoutTime.toString());
         setError('Too many failed attempts. Please try again in 15 minutes.');
       } else {
-        setError(`Invalid code. ${MAX_ATTEMPTS - newAttempts} attempts remaining.`);
+        setError(validationError.message || `Invalid code. ${MAX_ATTEMPTS - newAttempts} attempts remaining.`);
       }
       setCode('');
     } finally {
