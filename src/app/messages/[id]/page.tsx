@@ -9,6 +9,7 @@ import {
   getMessages,
   sendMessage,
   markConversationRead,
+  deleteConversation,
   ConversationDetail,
   Message,
 } from '@/lib/api';
@@ -75,7 +76,12 @@ function MessageBubble({ message, isSent, showDateSeparator }: MessageBubbleProp
   );
 }
 
-function ChatHeader({ conversation }: { conversation: ConversationDetail }) {
+interface ChatHeaderProps {
+  conversation: ConversationDetail;
+  onDeleteClick: () => void;
+}
+
+function ChatHeader({ conversation, onDeleteClick }: ChatHeaderProps) {
   return (
     <div className="sticky top-0 z-10 bg-white border-b border-[var(--border)]">
       <div className="max-w-2xl mx-auto px-4 py-3">
@@ -115,6 +121,16 @@ function ChatHeader({ conversation }: { conversation: ConversationDetail }) {
               {conversation.listing.combination} - {formatPrice(conversation.listing.price)}
             </Link>
           </div>
+
+          <button
+            onClick={onDeleteClick}
+            className="p-2 text-[var(--text-muted)] hover:text-red-600 rounded-lg hover:bg-red-50 transition-colors"
+            aria-label="Delete conversation"
+          >
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+            </svg>
+          </button>
         </div>
       </div>
     </div>
@@ -215,6 +231,8 @@ export default function ChatPage() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const lastMessageTimeRef = useRef<string | null>(null);
@@ -304,6 +322,24 @@ export default function ChatPage() {
     lastMessageTimeRef.current = newMessage.createdAt;
   };
 
+  // Delete conversation handler
+  const handleDeleteConversation = async () => {
+    setIsDeleting(true);
+    try {
+      const token = await getAccessToken();
+      if (!token) return;
+
+      await deleteConversation(token, conversationId);
+      router.push('/messages');
+    } catch (err) {
+      console.error('Failed to delete conversation:', err);
+      setError('Failed to delete conversation. Please try again.');
+      setShowDeleteModal(false);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   // Loading state
   if (authLoading || (isAuthenticated && isLoading)) {
     return (
@@ -334,7 +370,7 @@ export default function ChatPage() {
 
   return (
     <div className="bg-[var(--background)] min-h-screen flex flex-col">
-      <ChatHeader conversation={conversation} />
+      <ChatHeader conversation={conversation} onDeleteClick={() => setShowDeleteModal(true)} />
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto">
@@ -365,6 +401,40 @@ export default function ChatPage() {
       <div className="sr-only" role="status" aria-live="polite" aria-atomic="false">
         {messages.length > 0 && `${messages.length} messages`}
       </div>
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-black/50"
+            onClick={() => !isDeleting && setShowDeleteModal(false)}
+          />
+          <div className="relative bg-white rounded-2xl p-6 max-w-sm w-full shadow-xl">
+            <h3 className="text-lg font-semibold text-[var(--text)] mb-2">
+              Delete Conversation?
+            </h3>
+            <p className="text-[var(--text-secondary)] mb-6">
+              This conversation will be removed from your inbox. The other person will still be able to see it.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowDeleteModal(false)}
+                disabled={isDeleting}
+                className="flex-1 px-4 py-2.5 border border-[var(--border)] rounded-xl text-[var(--text)] font-medium hover:bg-[var(--background-subtle)] disabled:opacity-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDeleteConversation}
+                disabled={isDeleting}
+                className="flex-1 px-4 py-2.5 bg-red-600 text-white font-medium rounded-xl hover:bg-red-700 disabled:opacity-50 transition-colors"
+              >
+                {isDeleting ? 'Deleting...' : 'Delete'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
