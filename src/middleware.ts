@@ -23,8 +23,9 @@ const AUTH_ROUTES = [
 const ADMIN_EMAILS = ['hello@ausplates.app'];
 
 // Supabase project reference for JWKS URL
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const SUPABASE_PROJECT_REF = SUPABASE_URL?.match(/https:\/\/([^.]+)\.supabase\.co/)?.[1];
+// Try env var first, fall back to hardcoded value (public info, used for JWKS verification)
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://djestcmobrmoryhivduy.supabase.co';
+const SUPABASE_PROJECT_REF = SUPABASE_URL.match(/https:\/\/([^.]+)\.supabase\.co/)?.[1];
 const JWKS_URL = SUPABASE_PROJECT_REF
   ? new URL(`https://${SUPABASE_PROJECT_REF}.supabase.co/auth/v1/.well-known/jwks.json`)
   : null;
