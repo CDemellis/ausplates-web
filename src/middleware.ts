@@ -33,10 +33,6 @@ const JWKS_URL = SUPABASE_PROJECT_REF
 // Create JWKS keyset for ES256 verification (cached by jose library)
 const JWKS = JWKS_URL ? createRemoteJWKSet(JWKS_URL) : null;
 
-// Debug logging (remove after fixing)
-console.log('[Middleware Init] SUPABASE_URL:', SUPABASE_URL ? 'SET' : 'NOT SET');
-console.log('[Middleware Init] JWKS_URL:', JWKS_URL?.toString() || 'NOT SET');
-
 // Get the JWT secret for HS256 verification (legacy fallback)
 const JWT_SECRET = process.env.SUPABASE_JWT_SECRET;
 
@@ -51,32 +47,25 @@ async function verifyJwtAndGetPayload(token: string): Promise<{ email?: string; 
     const headerPart = token.split('.')[0];
     const header = JSON.parse(atob(headerPart.replace(/-/g, '+').replace(/_/g, '/')));
 
-    console.log('[JWT Verify] Algorithm:', header.alg, 'JWKS available:', !!JWKS, 'JWT_SECRET available:', !!JWT_SECRET);
-
     if (header.alg === 'ES256' && JWKS) {
       // ES256: Verify using Supabase's public JWKS
-      console.log('[JWT Verify] Attempting ES256 verification via JWKS...');
       const { payload } = await jwtVerify(token, JWKS, {
         algorithms: ['ES256'],
       });
-      console.log('[JWT Verify] ES256 verification SUCCESS, email:', payload.email);
       return payload as { email?: string; sub?: string };
     } else if (header.alg === 'HS256' && JWT_SECRET) {
       // HS256: Verify using shared secret (legacy)
-      console.log('[JWT Verify] Attempting HS256 verification via secret...');
       const secret = new TextEncoder().encode(JWT_SECRET);
       const { payload } = await jwtVerify(token, secret, {
         algorithms: ['HS256'],
       });
-      console.log('[JWT Verify] HS256 verification SUCCESS, email:', payload.email);
       return payload as { email?: string; sub?: string };
     } else {
-      console.error(`[JWT Verify] FAILED: unsupported algorithm ${header.alg} or missing config (JWKS: ${!!JWKS}, SECRET: ${!!JWT_SECRET})`);
+      // Unsupported algorithm or missing configuration
       return null;
     }
   } catch (error) {
     // JWT verification failed (invalid signature, expired, etc.)
-    console.error('[JWT Verify] ERROR:', error);
     return null;
   }
 }
