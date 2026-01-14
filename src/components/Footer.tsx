@@ -1,9 +1,15 @@
 'use client';
 
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 
 export function Footer() {
-  // Hide on admin subdomain
+  const pathname = usePathname();
+
+  // Hide on admin subdomain (client check) or admin routes (server + client check)
+  if (pathname?.startsWith('/ap-admin')) {
+    return null;
+  }
   if (typeof window !== 'undefined' && window.location.hostname.startsWith('admin.')) {
     return null;
   }

@@ -2,6 +2,7 @@
 
 import { Suspense } from 'react';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { MobileMenu } from './MobileMenu';
 import { SearchBar } from './SearchBar';
 import { MessagesIcon } from './MessagesIcon';
@@ -9,8 +10,12 @@ import { useAuth } from '@/lib/auth-context';
 
 export function Header() {
   const { user, isAuthenticated, isLoading } = useAuth();
+  const pathname = usePathname();
 
-  // Hide on admin subdomain
+  // Hide on admin subdomain (client check) or admin routes (server + client check)
+  if (pathname?.startsWith('/ap-admin')) {
+    return null;
+  }
   if (typeof window !== 'undefined' && window.location.hostname.startsWith('admin.')) {
     return null;
   }
