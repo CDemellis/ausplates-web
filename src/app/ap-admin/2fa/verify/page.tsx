@@ -10,7 +10,7 @@ const LOCKOUT_DURATION_MS = 15 * 60 * 1000; // 15 minutes
 
 export default function TwoFactorVerifyPage() {
   const router = useRouter();
-  const { user, getAccessToken } = useAuth();
+  const { getAccessToken } = useAuth();
   const [code, setCode] = useState('');
   const [isVerifying, setIsVerifying] = useState(false);
   const [error, setError] = useState('');

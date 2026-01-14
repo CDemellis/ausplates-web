@@ -64,26 +64,8 @@ async function verifyJwtAndGetPayload(token: string): Promise<{ email?: string; 
       // Unsupported algorithm or missing configuration
       return null;
     }
-  } catch (error) {
-    // JWT verification failed (invalid signature, expired, etc.)
-    return null;
-  }
-}
-
-/**
- * Decode JWT payload WITHOUT verification.
- * ONLY use this for non-security-critical checks (e.g., redirect optimization).
- * For security decisions, use verifyJwtAndGetPayload instead.
- */
-function decodeJwtPayloadUnsafe(token: string): { email?: string; sub?: string } | null {
-  try {
-    const parts = token.split('.');
-    if (parts.length !== 3) return null;
-    const payload = parts[1];
-    // Base64url decode
-    const decoded = atob(payload.replace(/-/g, '+').replace(/_/g, '/'));
-    return JSON.parse(decoded);
   } catch {
+    // JWT verification failed (invalid signature, expired, etc.)
     return null;
   }
 }
