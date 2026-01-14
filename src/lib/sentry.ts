@@ -57,10 +57,9 @@ async function getSentry(): Promise<SentryModule | null> {
   if (!sentryModule) {
     try {
       // Dynamic import with string literal to avoid TypeScript module resolution
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
       const moduleName = '@sentry/nextjs';
-      const module = await (Function(`return import("${moduleName}")`)() as Promise<SentryModule>);
-      sentryModule = module;
+      const importedSentry = await (Function(`return import("${moduleName}")`)() as Promise<SentryModule>);
+      sentryModule = importedSentry;
     } catch {
       console.warn('Sentry module not installed. Run: npm install @sentry/nextjs');
       return null;
