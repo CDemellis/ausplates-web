@@ -105,7 +105,9 @@ function PaymentForm({
         } catch (confirmErr) {
           // Payment succeeded but confirm failed - this is bad state
           // The webhook should handle it, but warn user
-          console.error('Confirm failed after payment:', confirmErr);
+          if (process.env.NODE_ENV === 'development') {
+            console.error('Confirm failed after payment:', confirmErr);
+          }
           onError('Payment received but publishing failed. Please contact support or check My Listings in a few minutes.');
         }
       }

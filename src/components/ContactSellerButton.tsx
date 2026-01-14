@@ -75,7 +75,9 @@ export function ContactSellerButton({
       setIsModalOpen(false);
       router.push(`/messages/${conversation.id}`);
     } catch (err) {
-      console.error('Failed to start conversation:', err);
+      if (process.env.NODE_ENV === 'development') {
+        console.error('Failed to start conversation:', err);
+      }
       setError('Failed to send message. Please try again.');
     } finally {
       setIsSending(false);

@@ -493,7 +493,9 @@ function Step2Details({
 
       onChange({ photos: [...draft.photos, ...newPhotos] });
     } catch (err) {
-      console.error('Upload error:', err);
+      if (process.env.NODE_ENV === 'development') {
+        console.error('Upload error:', err);
+      }
       setUploadError(err instanceof Error ? err.message : 'Failed to upload photo');
     } finally {
       setIsUploading(false);
@@ -1486,7 +1488,9 @@ function CreateListingContent() {
         throw new Error('Failed to create payment');
       }
     } catch (error) {
-      console.error('Create listing error:', error);
+      if (process.env.NODE_ENV === 'development') {
+        console.error('Create listing error:', error);
+      }
       setSubmitError(error instanceof Error ? error.message : 'Something went wrong. Please try again.');
     } finally {
       setIsCreatingListing(false);

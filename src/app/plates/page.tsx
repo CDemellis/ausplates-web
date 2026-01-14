@@ -76,7 +76,9 @@ export default async function BrowsePlatesPage(props: {
     listings = response?.listings || [];
     total = response?.total || 0;
   } catch (error) {
-    console.error('Failed to fetch listings:', error);
+    if (process.env.NODE_ENV === 'development') {
+      console.error('Failed to fetch listings:', error);
+    }
   }
 
   // Count active filters for display

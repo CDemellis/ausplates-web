@@ -16,7 +16,7 @@ interface PageProps {
 
 // Validate Stripe key exists before attempting to load
 const stripePublishableKey = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY;
-if (!stripePublishableKey) {
+if (!stripePublishableKey && process.env.NODE_ENV === 'development') {
   console.error('Stripe publishable key is not configured. Payment features will not work.');
 }
 const stripePromise = stripePublishableKey ? loadStripe(stripePublishableKey) : null;
@@ -104,7 +104,9 @@ function PaymentForm({
           await confirmBoostPayment(token, paymentIntentId);
           onSuccess();
         } catch (confirmErr) {
-          console.error('Confirm boost failed after payment:', confirmErr);
+          if (process.env.NODE_ENV === 'development') {
+            console.error('Confirm boost failed after payment:', confirmErr);
+          }
           onError('Payment received but boost activation failed. Please contact support or check My Listings in a few minutes.');
         }
       }

@@ -61,7 +61,9 @@ async function getSentry(): Promise<SentryModule | null> {
       const importedSentry = await (Function(`return import("${moduleName}")`)() as Promise<SentryModule>);
       sentryModule = importedSentry;
     } catch {
-      console.warn('Sentry module not installed. Run: npm install @sentry/nextjs');
+      if (process.env.NODE_ENV === 'development') {
+        console.warn('Sentry module not installed. Run: npm install @sentry/nextjs');
+      }
       return null;
     }
   }
@@ -77,7 +79,9 @@ export async function captureError(
 ): Promise<string | undefined> {
   const Sentry = await getSentry();
   if (!Sentry) {
-    console.error('[Sentry disabled]', error);
+    if (process.env.NODE_ENV === 'development') {
+      console.error('[Sentry disabled]', error);
+    }
     return undefined;
   }
 
@@ -115,7 +119,9 @@ export async function captureMessage(
 ): Promise<string | undefined> {
   const Sentry = await getSentry();
   if (!Sentry) {
-    console.log(`[Sentry disabled] ${level}: ${message}`);
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`[Sentry disabled] ${level}: ${message}`);
+    }
     return undefined;
   }
 

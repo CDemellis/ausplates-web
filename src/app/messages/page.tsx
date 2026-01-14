@@ -148,7 +148,9 @@ export default function MessagesPage() {
           setConversations(data);
         }
       } catch (err) {
-        console.error('Failed to fetch conversations:', err);
+        if (process.env.NODE_ENV === 'development') {
+          console.error('Failed to fetch conversations:', err);
+        }
         setError('Failed to load messages. Please try again.');
       } finally {
         setIsLoading(false);

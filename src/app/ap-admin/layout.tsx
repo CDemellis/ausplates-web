@@ -83,7 +83,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
         setIsCheckingAdmin(false);
       } catch (error) {
-        console.error('Failed to check admin status:', error);
+        if (process.env.NODE_ENV === 'development') {
+          console.error('Failed to check admin status:', error);
+        }
         setShowNotFound(true);
         setIsCheckingAdmin(false);
       }

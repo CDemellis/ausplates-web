@@ -51,7 +51,9 @@ export function QRLogin({ onSuccess }: Props) {
       setStatus('pending');
       setTimeLeft(data.expiresIn);
     } catch (err) {
-      console.error('Failed to create QR session:', err);
+      if (process.env.NODE_ENV === 'development') {
+        console.error('Failed to create QR session:', err);
+      }
       setError('Failed to create QR code. Please try again.');
       setStatus('error');
     }
@@ -127,7 +129,9 @@ export function QRLogin({ onSuccess }: Props) {
 
       // Continue polling
     } catch (err) {
-      console.error('Polling error:', err);
+      if (process.env.NODE_ENV === 'development') {
+        console.error('Polling error:', err);
+      }
     }
   }, [session, setUserFromSignIn, onSuccess]);
 

@@ -292,11 +292,15 @@ export function saveTokens(session: Session) {
     // Access tokens are JWTs (3 parts separated by dots)
     // Refresh tokens are opaque strings (NOT JWTs)
     if (!isValidJwtFormat(session.accessToken)) {
-      console.error('Invalid access token format detected, not storing');
+      if (process.env.NODE_ENV === 'development') {
+        console.error('Invalid access token format detected, not storing');
+      }
       return;
     }
     if (!isValidRefreshTokenFormat(session.refreshToken)) {
-      console.error('Invalid refresh token format detected, not storing');
+      if (process.env.NODE_ENV === 'development') {
+        console.error('Invalid refresh token format detected, not storing');
+      }
       return;
     }
     // Store in localStorage for client-side access

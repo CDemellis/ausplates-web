@@ -47,7 +47,9 @@ export function MessagesIcon({ showLabel = false, className = '' }: MessagesIcon
       }
     } catch (error) {
       // Fail silently - unread count is not critical
-      console.error('Failed to fetch unread count:', error);
+      if (process.env.NODE_ENV === 'development') {
+        console.error('Failed to fetch unread count:', error);
+      }
     } finally {
       isFetchingRef.current = false;
     }

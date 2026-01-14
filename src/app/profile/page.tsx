@@ -184,7 +184,9 @@ function EditProfileSection({ user, onUpdate }: { user: { fullName: string; avat
         setNotifications(data.notificationPreferences);
       }
     } catch (err) {
-      console.error('Failed to load profile:', err);
+      if (process.env.NODE_ENV === 'development') {
+        console.error('Failed to load profile:', err);
+      }
     }
   };
 

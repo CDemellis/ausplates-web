@@ -121,7 +121,9 @@ export default async function StatePlatesPage({ params, searchParams: searchPara
     listings = response?.listings || [];
     total = response?.total || 0;
   } catch (error) {
-    console.error('Failed to fetch listings:', error);
+    if (process.env.NODE_ENV === 'development') {
+      console.error('Failed to fetch listings:', error);
+    }
   }
 
   // Count active filters (excluding state since it's fixed)

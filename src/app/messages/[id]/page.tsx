@@ -270,7 +270,9 @@ export default function ChatPage() {
           markConversationRead(token, conversationId);
         }
       } catch (err) {
-        console.error('Failed to fetch conversation:', err);
+        if (process.env.NODE_ENV === 'development') {
+          console.error('Failed to fetch conversation:', err);
+        }
         setError('Failed to load conversation.');
       } finally {
         setIsLoading(false);
@@ -306,7 +308,7 @@ export default function ChatPage() {
         }
       } catch (err) {
         // Silently fail polling errors
-        if (isMounted) {
+        if (isMounted && process.env.NODE_ENV === 'development') {
           console.error('Polling error:', err);
         }
       }
@@ -344,7 +346,9 @@ export default function ChatPage() {
       await deleteConversation(token, conversationId);
       router.push('/messages');
     } catch (err) {
-      console.error('Failed to delete conversation:', err);
+      if (process.env.NODE_ENV === 'development') {
+        console.error('Failed to delete conversation:', err);
+      }
       setError('Failed to delete conversation. Please try again.');
       setShowDeleteModal(false);
     } finally {

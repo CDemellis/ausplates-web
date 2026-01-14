@@ -73,7 +73,9 @@ async function fetchWithRetry(
 
       // Check if we should retry this server error
       if (attempt < maxRetries && isRetryableError(null, response.status)) {
-        console.warn(`[API] Request failed with status ${response.status}, retrying (${attempt}/${maxRetries})...`);
+        if (process.env.NODE_ENV === 'development') {
+          console.warn(`[API] Request failed with status ${response.status}, retrying (${attempt}/${maxRetries})...`);
+        }
         await delay(retryDelay);
         retryDelay = Math.min(retryDelay * 2, 10000); // Max 10 second delay
         continue;
@@ -85,8 +87,10 @@ async function fetchWithRetry(
 
       // Check if we should retry this error
       if (attempt < maxRetries && isRetryableError(error)) {
-        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-        console.warn(`[API] Request failed: ${errorMessage}, retrying (${attempt}/${maxRetries})...`);
+        if (process.env.NODE_ENV === 'development') {
+          const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+          console.warn(`[API] Request failed: ${errorMessage}, retrying (${attempt}/${maxRetries})...`);
+        }
         await delay(retryDelay);
         retryDelay = Math.min(retryDelay * 2, 10000);
         continue;

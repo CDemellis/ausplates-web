@@ -195,7 +195,9 @@ export default function EditListingPage({ params }: PageProps) {
             const result = await uploadPhoto(token, photo.file, id);
             allPhotoUrls.push(result.url);
           } catch (uploadErr) {
-            console.error('Failed to upload photo:', uploadErr);
+            if (process.env.NODE_ENV === 'development') {
+              console.error('Failed to upload photo:', uploadErr);
+            }
           }
         }
         setIsUploadingPhotos(false);

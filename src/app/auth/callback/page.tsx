@@ -79,7 +79,9 @@ function CallbackHandler() {
           router.push('/');
         }
       } catch (err) {
-        console.error('Auth callback error:', err);
+        if (process.env.NODE_ENV === 'development') {
+          console.error('Auth callback error:', err);
+        }
         setError(err instanceof Error ? err.message : 'Failed to complete sign in');
       }
     };
