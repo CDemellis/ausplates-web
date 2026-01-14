@@ -95,7 +95,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const handleSignOut = async () => {
     localStorage.removeItem('admin_2fa_verified_at');
     await signOut();
-    router.push('/');
+    // Hard redirect to main site (router.push stays on admin subdomain)
+    window.location.href = 'https://ausplates.app';
   };
 
   // Show 404 for non-admins

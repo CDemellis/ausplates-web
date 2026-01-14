@@ -196,9 +196,6 @@ export default function TwoFactorVerifyPage() {
           )}
         </div>
 
-        <p className="text-center text-sm text-[#666666] mt-4">
-          Logged in as {user?.email}
-        </p>
       </div>
     </div>
   );
