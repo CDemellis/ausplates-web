@@ -59,21 +59,6 @@ export default async function HomePage() {
                 </span>
               </div>
 
-              {/* Stats */}
-              <div className="mt-12 grid grid-cols-3 gap-8">
-                <div>
-                  <p className="text-2xl md:text-3xl font-semibold text-[var(--text)]">{recentListings.length || '100'}+</p>
-                  <p className="text-sm text-[var(--text-muted)]">Active Listings</p>
-                </div>
-                <div>
-                  <p className="text-2xl md:text-3xl font-semibold text-[var(--text)]">8</p>
-                  <p className="text-sm text-[var(--text-muted)]">States & Territories</p>
-                </div>
-                <div>
-                  <p className="text-2xl md:text-3xl font-semibold text-[var(--green)]">$9.99</p>
-                  <p className="text-sm text-[var(--text-muted)]">To List</p>
-                </div>
-              </div>
             </div>
 
             {/* Right: Featured Plates Preview */}
