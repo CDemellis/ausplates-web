@@ -93,10 +93,13 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   }, [authLoading, user, getAccessToken, pathname, router]);
 
   const handleSignOut = async () => {
+    // Clear admin-specific state
     localStorage.removeItem('admin_2fa_verified_at');
+    // Clear tokens on admin subdomain
     await signOut();
-    // Hard redirect to main site (router.push stays on admin subdomain)
-    window.location.href = 'https://ausplates.app';
+    // Redirect to main site logout page to clear its localStorage too
+    // (localStorage is NOT shared across subdomains, only cookies are)
+    window.location.href = 'https://ausplates.app/logout';
   };
 
   // Show 404 for non-admins
