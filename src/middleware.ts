@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { jwtVerify } from 'jose';
+import { jwtVerify, createRemoteJWKSet } from 'jose';
 
 // Routes that require authentication (main site)
 const PROTECTED_ROUTES = [
@@ -22,29 +22,49 @@ const AUTH_ROUTES = [
 // This must match the list in src/app/ap-admin/layout.tsx
 const ADMIN_EMAILS = ['hello@ausplates.app'];
 
-// Get the JWT secret for verification
-// Must be set to the Supabase JWT secret in production
+// Supabase project reference for JWKS URL
+const SUPABASE_PROJECT_REF = process.env.NEXT_PUBLIC_SUPABASE_URL?.match(/https:\/\/([^.]+)\.supabase\.co/)?.[1];
+const JWKS_URL = SUPABASE_PROJECT_REF
+  ? new URL(`https://${SUPABASE_PROJECT_REF}.supabase.co/auth/v1/.well-known/jwks.json`)
+  : null;
+
+// Create JWKS keyset for ES256 verification (cached by jose library)
+const JWKS = JWKS_URL ? createRemoteJWKSet(JWKS_URL) : null;
+
+// Get the JWT secret for HS256 verification (legacy fallback)
 const JWT_SECRET = process.env.SUPABASE_JWT_SECRET;
 
 /**
  * Verify JWT signature and decode payload.
+ * Supports both ES256 (asymmetric, via JWKS) and HS256 (symmetric, via secret).
  * Returns null if verification fails or token is invalid.
  */
 async function verifyJwtAndGetPayload(token: string): Promise<{ email?: string; sub?: string } | null> {
-  // If no secret configured, fail closed (deny access)
-  if (!JWT_SECRET) {
-    console.error('SUPABASE_JWT_SECRET not configured - JWT verification disabled');
-    return null;
-  }
-
   try {
-    const secret = new TextEncoder().encode(JWT_SECRET);
-    const { payload } = await jwtVerify(token, secret, {
-      algorithms: ['HS256'],
-    });
-    return payload as { email?: string; sub?: string };
+    // Decode header to check algorithm
+    const headerPart = token.split('.')[0];
+    const header = JSON.parse(atob(headerPart.replace(/-/g, '+').replace(/_/g, '/')));
+
+    if (header.alg === 'ES256' && JWKS) {
+      // ES256: Verify using Supabase's public JWKS
+      const { payload } = await jwtVerify(token, JWKS, {
+        algorithms: ['ES256'],
+      });
+      return payload as { email?: string; sub?: string };
+    } else if (header.alg === 'HS256' && JWT_SECRET) {
+      // HS256: Verify using shared secret (legacy)
+      const secret = new TextEncoder().encode(JWT_SECRET);
+      const { payload } = await jwtVerify(token, secret, {
+        algorithms: ['HS256'],
+      });
+      return payload as { email?: string; sub?: string };
+    } else {
+      console.error(`JWT verification failed: unsupported algorithm ${header.alg} or missing config`);
+      return null;
+    }
   } catch (error) {
     // JWT verification failed (invalid signature, expired, etc.)
+    console.error('JWT verification error:', error);
     return null;
   }
 }
