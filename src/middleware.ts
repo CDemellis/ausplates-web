@@ -85,9 +85,17 @@ export async function middleware(request: NextRequest) {
     const rawToken = request.cookies.get('ausplates_access_token')?.value;
     const accessToken = rawToken ? decodeURIComponent(rawToken) : undefined;
 
-    // No token = not authenticated, return 404
+    // No token = not authenticated, redirect to signin
+    // This allows admins to log in via the main signin page
+    // SECURITY: Only unauthenticated users see the redirect; authenticated non-admins get 404
     if (!accessToken) {
-      return NextResponse.rewrite(new URL('/not-found', request.url));
+      // Build redirect URL to main signin with return to admin subdomain
+      const adminUrl = request.nextUrl.clone();
+      adminUrl.pathname = pathname === '/' ? '/' : pathname;
+      const redirectTarget = `https://admin.ausplates.app${adminUrl.pathname}${adminUrl.search}`;
+      const signinUrl = new URL('https://ausplates.app/signin');
+      signinUrl.searchParams.set('redirect', redirectTarget);
+      return NextResponse.redirect(signinUrl);
     }
 
     // SECURITY: Verify JWT signature before trusting claims
@@ -95,6 +103,7 @@ export async function middleware(request: NextRequest) {
     const payload = await verifyJwtAndGetPayload(accessToken);
     if (!payload?.email || !ADMIN_EMAILS.includes(payload.email)) {
       // JWT invalid/forged or not an admin - return 404 (don't reveal admin panel exists)
+      // SECURITY: Authenticated non-admins see 404, not a login redirect
       return NextResponse.rewrite(new URL('/not-found', request.url));
     }
 
