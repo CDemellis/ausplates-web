@@ -2,5 +2,17 @@
 User-agent: *
 Allow: /
 
+# Block authenticated-only pages (redirect to signin)
+Disallow: /saved
+Disallow: /messages
+Disallow: /profile
+Disallow: /create
+Disallow: /my-listings
+Disallow: /notifications
+
+# Block auth pages (no SEO value)
+Disallow: /signin
+Disallow: /signup
+
 # Sitemap
 Sitemap: https://ausplates.app/sitemap.xml
