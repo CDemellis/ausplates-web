@@ -1,5 +1,6 @@
 import { Metadata } from 'next';
 import Link from 'next/link';
+import Image from 'next/image';
 import { notFound } from 'next/navigation';
 import { getListingBySlug } from '@/lib/api';
 import {
@@ -282,9 +283,9 @@ export default async function ListingDetailPage({ params, searchParams }: PagePr
               {listing.seller && (
                 <div className="mt-6 p-6 border border-[var(--border)] rounded-2xl">
                   <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 bg-[var(--green)] rounded-full flex items-center justify-center text-white font-semibold text-lg overflow-hidden">
+                    <div className="relative w-12 h-12 bg-[var(--green)] rounded-full flex items-center justify-center text-white font-semibold text-lg overflow-hidden">
                       {listing.seller.avatarUrl ? (
-                        <img src={listing.seller.avatarUrl} alt={listing.seller.fullName} className="w-full h-full object-cover" />
+                        <Image src={listing.seller.avatarUrl} alt={listing.seller.fullName} fill className="object-cover" sizes="48px" />
                       ) : (
                         listing.seller.fullName.charAt(0)
                       )}

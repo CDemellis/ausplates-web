@@ -3,6 +3,7 @@
 import { useState, useEffect, use } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import Image from 'next/image';
 import { useAuth } from '@/lib/auth-context';
 import { updateListing, UpdateListingData } from '@/lib/api';
 import { revalidateListing } from '@/app/actions';
@@ -526,7 +527,7 @@ export default function EditListingPage({ params }: PageProps) {
                       <div className="grid grid-cols-3 gap-2">
                         {form.photos.map((url, index) => (
                           <div key={index} className="relative aspect-square rounded-lg overflow-hidden bg-[var(--background-subtle)]">
-                            <img src={url} alt={`Photo ${index + 1}`} className="w-full h-full object-cover" />
+                            <Image src={url} alt={`Photo ${index + 1}`} fill className="object-cover" sizes="(max-width: 768px) 33vw, 128px" />
                             <button
                               type="button"
                               onClick={() => {
@@ -553,6 +554,7 @@ export default function EditListingPage({ params }: PageProps) {
                       <div className="grid grid-cols-3 gap-2">
                         {newPhotos.map((photo, index) => (
                           <div key={index} className="relative aspect-square rounded-lg overflow-hidden bg-[var(--background-subtle)]">
+                            {/* Using img for blob URL preview - next/image doesn't support blob URLs */}
                             <img src={photo.preview} alt={`New photo ${index + 1}`} className="w-full h-full object-cover" />
                             <button
                               type="button"
