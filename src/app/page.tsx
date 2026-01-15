@@ -35,47 +35,112 @@ export default async function HomePage() {
           <div className="grid lg:grid-cols-2 gap-12 items-center">
             {/* Left: Text */}
             <div>
-              <h1 className="text-4xl md:text-5xl lg:text-6xl font-semibold text-[var(--text)] leading-tight">
-                Find Your Perfect{' '}
-                <span className="text-[var(--green)]">Plate</span>
+              {/* Launch Special Badge */}
+              <div className="inline-flex items-center gap-2 px-4 py-2 bg-[var(--green)]/10 border border-[var(--green)]/20 rounded-full mb-6">
+                <svg className="w-4 h-4 text-[var(--green)]" fill="currentColor" viewBox="0 0 20 20">
+                  <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                </svg>
+                <span className="text-sm font-semibold text-[var(--green)]">Launch Special - Limited Time</span>
+              </div>
+
+              {/* Main Headline */}
+              <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-[var(--text)] leading-tight">
+                List Your Plate{' '}
+                <span className="text-[var(--green)]">FREE</span>
               </h1>
-              <p className="mt-6 text-lg md:text-xl text-[var(--text-secondary)] max-w-xl">
-                Australia&apos;s marketplace for personalised number plates. Browse thousands of plates from every state.
+
+              {/* Supporting Copy */}
+              <p className="mt-6 text-lg md:text-xl text-[var(--text-secondary)] max-w-xl leading-relaxed">
+                Be an early mover on Australia&apos;s newest number plate marketplace. Create your listing today - completely free during our launch special.
               </p>
 
-              {/* CTA Buttons */}
-              <div className="mt-8 flex flex-col sm:flex-row gap-4">
-                <Link
-                  href="/plates"
-                  className="inline-flex items-center justify-center px-6 py-3 bg-[var(--green)] text-white text-base font-medium rounded-xl hover:bg-[#006B31] transition-colors"
-                >
-                  Browse Plates
-                </Link>
+              {/* Primary CTA */}
+              <div className="mt-8">
                 <Link
                   href="/create"
-                  className="inline-flex items-center justify-center gap-2 px-6 py-3 border-2 border-[var(--green)] text-[var(--green)] text-base font-medium rounded-xl hover:bg-[var(--green)] hover:text-white transition-colors"
+                  className="inline-flex items-center justify-center gap-2 px-8 py-4 bg-[var(--green)] text-white text-lg font-semibold rounded-xl hover:bg-[#006B31] transition-colors shadow-lg hover:shadow-xl"
                 >
-                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                   </svg>
-                  Create Listing
+                  Claim Your Free Listing
                 </Link>
               </div>
 
+              {/* Trust Signals */}
+              <ul className="mt-8 space-y-3">
+                {[
+                  'No credit card required',
+                  'No commission fees',
+                  'Reach buyers Australia-wide',
+                ].map((feature) => (
+                  <li key={feature} className="flex items-center gap-3 text-[var(--text-secondary)]">
+                    <svg className="w-5 h-5 text-[var(--green)] flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                    </svg>
+                    {feature}
+                  </li>
+                ))}
+              </ul>
+
+              {/* Secondary Browse Link */}
+              <div className="mt-8 pt-6 border-t border-gray-200">
+                <Link
+                  href="/plates"
+                  className="inline-flex items-center gap-2 text-sm font-medium text-[var(--text-secondary)] hover:text-[var(--green)] transition-colors"
+                >
+                  Or browse available plates
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </Link>
+              </div>
             </div>
 
-            {/* Right: Featured Plates Preview */}
-            <div className="hidden lg:flex justify-center">
-              <div className="relative">
-                {/* Decorative plates */}
-                <div className="absolute -top-4 -left-8 transform -rotate-6 opacity-80">
-                  <PlateView combination="LEGEND" state="VIC" size="large" />
+            {/* Right: Standard vs Featured Comparison */}
+            <div className="hidden lg:flex justify-center items-center">
+              <div className="flex items-center gap-8">
+                {/* Standard Listing */}
+                <div className="flex flex-col items-center gap-4">
+                  <div className="relative opacity-75 scale-95 transition-all">
+                    <PlateView combination="LEGEND" state="VIC" size="large" />
+                  </div>
+                  <div className="text-center">
+                    <p className="text-sm font-medium text-[var(--text-muted)]">Standard Listing</p>
+                  </div>
                 </div>
-                <div className="relative z-10">
-                  <PlateView combination="BOSS" state="NSW" size="large" />
+
+                {/* Arrow/Divider */}
+                <div className="flex flex-col items-center gap-2">
+                  <svg className="w-8 h-8 text-[var(--green)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                  </svg>
+                  <span className="text-xs font-semibold text-[var(--green)]">Upgrade</span>
                 </div>
-                <div className="absolute -bottom-4 -right-8 transform rotate-6 opacity-80">
-                  <PlateView combination="CEO" state="QLD" size="large" />
+
+                {/* Featured Listing */}
+                <div className="flex flex-col items-center gap-4">
+                  <div className="relative">
+                    {/* Featured Badge */}
+                    <div className="absolute -top-3 -right-3 z-10 bg-gradient-to-r from-yellow-400 to-yellow-600 text-white text-xs font-bold px-3 py-1 rounded-full shadow-lg">
+                      ✨ FEATURED
+                    </div>
+                    {/* Plate with glow effect */}
+                    <div className="relative scale-105 transition-all" style={{
+                      filter: 'drop-shadow(0 0 20px rgba(0, 123, 55, 0.4))',
+                    }}>
+                      <PlateView combination="LEGEND" state="VIC" size="large" />
+                    </div>
+                    {/* Subtle pulse animation ring */}
+                    <div className="absolute inset-0 rounded-lg animate-pulse" style={{
+                      boxShadow: '0 0 30px 10px rgba(0, 123, 55, 0.2)',
+                      pointerEvents: 'none',
+                    }}></div>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-sm font-semibold text-[var(--green)]">Get Featured</p>
+                    <p className="text-xs text-[var(--text-muted)]">Stand out from the crowd</p>
+                  </div>
                 </div>
               </div>
             </div>
