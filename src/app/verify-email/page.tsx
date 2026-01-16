@@ -191,17 +191,11 @@ function VerifyEmailContent() {
 
         {/* CTA Button */}
         <Link
-          href="/signin"
+          href="/signup"
           className="inline-block w-full bg-[var(--green)] text-white py-4 px-8 rounded-xl font-semibold text-lg hover:bg-[#006B31] transition-colors mb-3"
         >
-          {promoCode ? 'Create Your Free Listing' : 'Sign In'}
+          {promoCode ? 'Claim Your Free Listing' : 'Sign Up'}
         </Link>
-
-        {promoCode && (
-          <p className="text-xs text-[var(--text-muted)]">
-            You&apos;ll be asked to sign in first, then you can create your listing.
-          </p>
-        )}
       </div>
     );
   }
