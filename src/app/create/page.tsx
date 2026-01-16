@@ -8,7 +8,7 @@ import { loadStripe } from '@stripe/stripe-js';
 import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { useAuth } from '@/lib/auth-context';
 import { PlateView } from '@/components/PlateView';
-import { createListing, createCheckout, confirmPayment, uploadPhoto, deletePhoto } from '@/lib/api';
+import { createListing, createCheckout, confirmPayment, uploadPhoto, deletePhoto, getUserPromoCode } from '@/lib/api';
 
 import {
   AustralianState,
@@ -1350,21 +1350,30 @@ function CreateListingContent() {
   const [isValidatingPromo, setIsValidatingPromo] = useState(false);
   const [promoValidation, setPromoValidation] = useState<{ valid: boolean; message: string } | null>(null);
 
-  // Welcome promo code from email verification
+  // Welcome promo code from backend (generated on email verification)
   const [welcomeCode, setWelcomeCode] = useState<string | null>(null);
-  const WELCOME_CODE_KEY = 'ausplates_welcome_code';
+  const [isLoadingPromoCode, setIsLoadingPromoCode] = useState(false);
 
-  // Load welcome code from localStorage
+  // Fetch user's promo code from API when authenticated
   useEffect(() => {
-    try {
-      const code = localStorage.getItem(WELCOME_CODE_KEY);
-      if (code) {
-        setWelcomeCode(code);
+    if (!accessToken) return;
+
+    const fetchPromoCode = async () => {
+      setIsLoadingPromoCode(true);
+      try {
+        const promoData = await getUserPromoCode(accessToken);
+        if (promoData?.code) {
+          setWelcomeCode(promoData.code);
+        }
+      } catch {
+        // Non-critical - continue without promo code
+      } finally {
+        setIsLoadingPromoCode(false);
       }
-    } catch {
-      // localStorage may be unavailable
-    }
-  }, []);
+    };
+
+    fetchPromoCode();
+  }, [accessToken]);
 
   // Check URL for fresh=true to clear draft, or load from localStorage
   useEffect(() => {
@@ -1445,16 +1454,11 @@ function CreateListingContent() {
     });
   }, []);
 
-  // Apply welcome code and clear it from localStorage
+  // Apply welcome code to promo field
   const applyWelcomeCode = useCallback(() => {
     if (welcomeCode) {
       updateDraft({ promoCode: welcomeCode });
-      setWelcomeCode(null);
-      try {
-        localStorage.removeItem(WELCOME_CODE_KEY);
-      } catch {
-        // Ignore errors
-      }
+      setWelcomeCode(null); // Clear local state so banner disappears
     }
   }, [welcomeCode, updateDraft]);
 

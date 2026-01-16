@@ -43,7 +43,7 @@ export async function signUp(email: string, password: string, fullName: string):
 }
 
 // Verify email with token
-export async function verifyEmail(token: string): Promise<{ message: string; verified: boolean }> {
+export async function verifyEmail(token: string): Promise<{ message: string; verified: boolean; promoCode?: string }> {
   const res = await fetch(`${API_BASE_URL}/api/auth/verify-email`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

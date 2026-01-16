@@ -1067,6 +1067,47 @@ export async function redeemPromoCode(
   };
 }
 
+// Get the authenticated user's active welcome promo code
+export interface UserPromoCode {
+  code: string;
+  type: string;
+  expiresAt: string;
+  status: string;
+}
+
+export async function getUserPromoCode(accessToken: string): Promise<UserPromoCode | null> {
+  const url = `${API_BASE_URL}/api/users/me/promo-code`;
+
+  try {
+    const res = await fetch(url, {
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+      },
+    });
+
+    if (!res.ok) {
+      return null;
+    }
+
+    const data = await res.json();
+
+    // API returns { code: null } if no active code
+    if (!data.code) {
+      return null;
+    }
+
+    return {
+      code: data.code,
+      type: data.type,
+      expiresAt: data.expiresAt,
+      status: data.status,
+    };
+  } catch {
+    // Fail silently - promo code fetch is not critical
+    return null;
+  }
+}
+
 // ============================================
 // USER PROFILE API
 // ============================================

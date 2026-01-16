@@ -4,10 +4,6 @@ import { Suspense, useEffect, useState, useRef } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { verifyEmail, resendVerification } from '@/lib/auth';
-import { assignCodeToUser, isPoolExhausted } from '@/lib/promo-pool';
-
-// Store the last assigned code for display on create page
-const LAST_CODE_KEY = 'ausplates_welcome_code';
 
 function VerifyEmailContent() {
   const searchParams = useSearchParams();
@@ -29,21 +25,12 @@ function VerifyEmailContent() {
       hasVerified.current = true;
       const doVerify = async () => {
         try {
-          await verifyEmail(token);
+          const result = await verifyEmail(token);
           setStatus('success');
 
-          // Assign a promo code to this verified user
-          // Use token hash as unique identifier for this verification
-          const verificationId = `verified_${token.substring(0, 16)}_${Date.now()}`;
-          const code = assignCodeToUser(verificationId);
-          if (code) {
-            setPromoCode(code);
-            // Store for display on create page
-            try {
-              localStorage.setItem(LAST_CODE_KEY, code);
-            } catch {
-              // localStorage may be unavailable
-            }
+          // Backend generates and returns the welcome promo code
+          if (result.promoCode) {
+            setPromoCode(result.promoCode);
           }
         } catch (err) {
           setStatus('error');
@@ -173,12 +160,6 @@ function VerifyEmailContent() {
             </button>
             <p className="text-xs text-[var(--text-muted)] mt-3">
               Use this code when creating your first listing to list for free!
-            </p>
-          </div>
-        ) : !isPoolExhausted() ? (
-          <div className="bg-[var(--background-subtle)] rounded-xl p-4 mb-6">
-            <p className="text-[var(--text-secondary)]">
-              Sign in to get started with your account.
             </p>
           </div>
         ) : (
