@@ -151,6 +151,11 @@ const TIER_INFO: Record<BoostType, { name: string; features: string[] }> = {
 
 const MAX_PHOTOS = 5;
 
+// Launch promotion: free listings until April 30, 2026
+// During this period, skip boost selection and go straight to details
+const PROMO_END_DATE = new Date('2026-04-30T23:59:59');
+const isPromoPeriod = () => Date.now() < PROMO_END_DATE.getTime();
+
 // ============================================
 // HELPER COMPONENTS
 // ============================================
@@ -926,19 +931,22 @@ function Step2Details({
 
         {/* Navigation */}
         <div className="flex gap-4 mt-6 pt-6 border-t border-[var(--border)]">
-          <button
-            type="button"
-            onClick={onBack}
-            className="flex-1 py-3 border border-[var(--border)] text-[var(--text)] font-medium rounded-xl hover:bg-[var(--background-subtle)] transition-colors"
-          >
-            Back
-          </button>
+          {/* Hide Back button during promo period since there's no plan selection */}
+          {!isPromoPeriod() && (
+            <button
+              type="button"
+              onClick={onBack}
+              className="flex-1 py-3 border border-[var(--border)] text-[var(--text)] font-medium rounded-xl hover:bg-[var(--background-subtle)] transition-colors"
+            >
+              Back
+            </button>
+          )}
           <button
             type="button"
             onClick={onContinue}
             className="flex-1 py-3 bg-[var(--green)] text-white font-medium rounded-xl hover:bg-[#006B31] transition-colors"
           >
-            Review & Pay
+            {isPromoPeriod() ? 'Review & Publish' : 'Review & Pay'}
           </button>
         </div>
       </div>
@@ -1361,9 +1369,15 @@ function CreateListingContent() {
   // Check URL for fresh=true to clear draft, or load from localStorage
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
+    const promo = isPromoPeriod();
+
     if (params.get('fresh') === 'true') {
       localStorage.removeItem(STORAGE_KEY);
-      setDraft(INITIAL_DRAFT);
+      // During promo period, skip plan selection and start at details with Standard tier
+      const initialDraft = promo
+        ? { ...INITIAL_DRAFT, step: 'details' as Step, boostType: 'none' as BoostType }
+        : INITIAL_DRAFT;
+      setDraft(initialDraft);
       // Remove the query param from URL
       window.history.replaceState({}, '', '/create');
       setDraftInitialized(true);
@@ -1378,13 +1392,28 @@ function CreateListingContent() {
         // Check if draft is expired (7 days)
         const expiryMs = DRAFT_EXPIRY_DAYS * 24 * 60 * 60 * 1000;
         if (Date.now() - parsed.savedAt < expiryMs) {
-          setDraft({ ...INITIAL_DRAFT, ...parsed });
+          let loadedDraft = { ...INITIAL_DRAFT, ...parsed };
+          // During promo period, ensure we skip plan step and use Standard tier
+          if (promo) {
+            loadedDraft = { ...loadedDraft, boostType: 'none', step: loadedDraft.step === 'plan' ? 'details' : loadedDraft.step };
+          }
+          setDraft(loadedDraft);
         } else {
           localStorage.removeItem(STORAGE_KEY);
+          // Set initial draft for promo period
+          if (promo) {
+            setDraft({ ...INITIAL_DRAFT, step: 'details', boostType: 'none' });
+          }
         }
       } catch {
-        // Ignore parse errors
+        // Ignore parse errors, but set promo draft if applicable
+        if (promo) {
+          setDraft({ ...INITIAL_DRAFT, step: 'details', boostType: 'none' });
+        }
       }
+    } else if (promo) {
+      // No saved draft, start at details during promo period
+      setDraft({ ...INITIAL_DRAFT, step: 'details', boostType: 'none' });
     }
     setDraftInitialized(true);
   }, []);
@@ -1478,7 +1507,10 @@ function CreateListingContent() {
 
   const handleBack = useCallback(() => {
     if (draft.step === 'details') {
-      updateDraft({ step: 'plan' });
+      // During promo period, don't allow going back to plan selection
+      if (!isPromoPeriod()) {
+        updateDraft({ step: 'plan' });
+      }
     } else if (draft.step === 'pay') {
       // Reset payment state when going back
       setClientSecret(null);
@@ -1618,15 +1650,15 @@ function CreateListingContent() {
             <span className="text-sm sr-only">Close</span>
           </Link>
 
-          {/* Progress Dots */}
+          {/* Progress Dots - only 2 steps during promo period (no plan selection) */}
           <div className="flex items-center gap-2">
-            {(['plan', 'details', 'pay'] as Step[]).map((s, i) => (
+            {(isPromoPeriod() ? ['details', 'pay'] as Step[] : ['plan', 'details', 'pay'] as Step[]).map((s, i, arr) => (
               <div
                 key={s}
                 className={`w-2 h-2 rounded-full transition-all ${
                   draft.step === s
                     ? 'w-6 bg-[var(--green)]'
-                    : (['plan', 'details', 'pay'] as Step[]).indexOf(draft.step) > i
+                    : arr.indexOf(draft.step) > i
                     ? 'bg-[var(--green)]'
                     : 'bg-[var(--border)]'
                 }`}
@@ -1635,7 +1667,7 @@ function CreateListingContent() {
           </div>
 
           {/* Start Fresh link - only show if draft has data */}
-          {(draft.combination || draft.step !== 'plan') ? (
+          {(draft.combination || (isPromoPeriod() ? draft.step !== 'details' : draft.step !== 'plan')) ? (
             <Link
               href="/create?fresh=true"
               className="text-xs text-[var(--text-muted)] hover:text-[var(--green)] transition-colors"

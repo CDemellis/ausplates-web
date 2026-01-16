@@ -57,7 +57,7 @@ export default async function HomePage() {
               {/* Primary CTA */}
               <div className="mt-8">
                 <Link
-                  href="/create"
+                  href="/signup"
                   className="inline-flex items-center justify-center gap-2 px-8 py-4 bg-[var(--green)] text-white text-lg font-semibold rounded-xl hover:bg-[#006B31] transition-colors shadow-lg hover:shadow-xl"
                 >
                   <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
