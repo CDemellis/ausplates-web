@@ -165,11 +165,11 @@ export default function CreatePromoPage() {
                 value={count}
                 onChange={(e) => setCount(e.target.value)}
                 min="1"
-                max="100"
+                max="1000"
                 className="w-full px-4 py-2 border border-[#EBEBEB] rounded-lg focus:outline-none focus:border-[#00843D]"
                 required
               />
-              <p className="mt-1 text-xs text-[#999999]">Max 100 at once</p>
+              <p className="mt-1 text-xs text-[#999999]">Max 1000 at once</p>
             </div>
           </div>
         )}
