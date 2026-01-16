@@ -1352,14 +1352,12 @@ function CreateListingContent() {
 
   // Welcome promo code from backend (generated on email verification)
   const [welcomeCode, setWelcomeCode] = useState<string | null>(null);
-  const [isLoadingPromoCode, setIsLoadingPromoCode] = useState(false);
 
   // Fetch user's promo code from API when authenticated
   useEffect(() => {
     if (!isAuthenticated) return;
 
     const fetchPromoCode = async () => {
-      setIsLoadingPromoCode(true);
       try {
         const token = await getAccessToken();
         if (!token) return;
@@ -1370,8 +1368,6 @@ function CreateListingContent() {
         }
       } catch {
         // Non-critical - continue without promo code
-      } finally {
-        setIsLoadingPromoCode(false);
       }
     };
 
