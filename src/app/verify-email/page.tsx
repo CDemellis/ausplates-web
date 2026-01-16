@@ -189,12 +189,12 @@ function VerifyEmailContent() {
           </div>
         )}
 
-        {/* CTA Button */}
+        {/* CTA Button - go to create if they have a promo code, otherwise signin */}
         <Link
-          href="/signup"
+          href={promoCode ? '/create' : '/signin'}
           className="inline-block w-full bg-[var(--green)] text-white py-4 px-8 rounded-xl font-semibold text-lg hover:bg-[#006B31] transition-colors mb-3"
         >
-          {promoCode ? 'Claim Your Free Listing' : 'Sign Up'}
+          {promoCode ? 'Create Your Free Listing' : 'Sign In'}
         </Link>
       </div>
     );
