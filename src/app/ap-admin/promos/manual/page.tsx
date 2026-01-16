@@ -4,22 +4,26 @@ import { Suspense, useEffect, useState, useRef, useCallback } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/lib/auth-context';
-import { getPromoCodes, PromoCode, updatePromoCode } from '@/lib/api';
+import { getPromoCodes, PromoCode, updatePromoCode, getCampaigns } from '@/lib/api';
 
 function ManualCodesContent() {
   const searchParams = useSearchParams();
   const { getAccessToken } = useAuth();
   const [codes, setCodes] = useState<PromoCode[]>([]);
+  const [campaigns, setCampaigns] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isExporting, setIsExporting] = useState(false);
   const [error, setError] = useState('');
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [totalCodes, setTotalCodes] = useState(0);
   const [search, setSearch] = useState('');
+  const [campaignFilter, setCampaignFilter] = useState('');
 
   // Get type from URL param - defaults to showing both sourced and manual
   const typeFilter = searchParams.get('type') || '';
 
-  const prevFiltersRef = useRef({ page, search, typeFilter });
+  const prevFiltersRef = useRef({ page, search, typeFilter, campaignFilter });
 
   const loadCodes = useCallback(async () => {
     try {
@@ -29,29 +33,106 @@ function ManualCodesContent() {
 
       const data = await getPromoCodes(token, {
         type: typeFilter as 'sourced' | 'manual' | undefined,
+        campaign: campaignFilter || undefined,
         search: search || undefined,
         page,
         limit: 50,
       });
       setCodes(data.codes);
       setTotalPages(data.pagination.totalPages);
+      setTotalCodes(data.pagination.total);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load codes');
     } finally {
       setIsLoading(false);
     }
-  }, [getAccessToken, typeFilter, search, page]);
+  }, [getAccessToken, typeFilter, campaignFilter, search, page]);
+
+  const loadCampaigns = useCallback(async () => {
+    try {
+      const token = await getAccessToken();
+      if (!token) return;
+      const campaignList = await getCampaigns(token);
+      setCampaigns(campaignList);
+    } catch (err) {
+      console.error('Failed to load campaigns:', err);
+    }
+  }, [getAccessToken]);
+
+  useEffect(() => {
+    loadCampaigns();
+  }, [loadCampaigns]);
 
   useEffect(() => {
     const prev = prevFiltersRef.current;
-    const filtersChanged = prev.page !== page || prev.search !== search || prev.typeFilter !== typeFilter;
+    const filtersChanged = prev.page !== page || prev.search !== search || prev.typeFilter !== typeFilter || prev.campaignFilter !== campaignFilter;
 
     if (filtersChanged) {
-      prevFiltersRef.current = { page, search, typeFilter };
+      prevFiltersRef.current = { page, search, typeFilter, campaignFilter };
     }
 
     loadCodes();
-  }, [loadCodes, page, search, typeFilter]);
+  }, [loadCodes, page, search, typeFilter, campaignFilter]);
+
+  // CSV Export functionality
+  const handleExportCSV = async () => {
+    try {
+      setIsExporting(true);
+      const token = await getAccessToken();
+      if (!token) return;
+
+      // Fetch all codes matching current filters (up to 10000)
+      const data = await getPromoCodes(token, {
+        type: typeFilter as 'sourced' | 'manual' | undefined,
+        campaign: campaignFilter || undefined,
+        search: search || undefined,
+        page: 1,
+        limit: 10000,
+      });
+
+      if (data.codes.length === 0) {
+        setError('No codes to export');
+        return;
+      }
+
+      // Generate CSV content
+      const headers = ['code', 'type', 'max_uses', 'times_used', 'status', 'campaign', 'source', 'expires_at', 'created_at'];
+      const csvRows = [
+        headers.join(','),
+        ...data.codes.map(code => [
+          code.code,
+          code.type,
+          code.maxUses,
+          code.timesUsed,
+          code.isActive ? code.status : 'deactivated',
+          code.campaign || '',
+          code.source || '',
+          code.expiresAt || '',
+          code.createdAt || '',
+        ].map(val => `"${String(val).replace(/"/g, '""')}"`).join(','))
+      ];
+
+      const csvContent = csvRows.join('\n');
+
+      // Create and trigger download
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.setAttribute('href', url);
+      const filename = campaignFilter
+        ? `promo-codes-${campaignFilter}-${new Date().toISOString().split('T')[0]}.csv`
+        : `promo-codes-${new Date().toISOString().split('T')[0]}.csv`;
+      link.setAttribute('download', filename);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to export codes');
+    } finally {
+      setIsExporting(false);
+    }
+  };
 
   const handleDeactivate = async (code: PromoCode) => {
     if (!confirm(`Deactivate code ${code.code}?`)) return;
@@ -106,7 +187,7 @@ function ManualCodesContent() {
       )}
 
       {/* Search and Filters */}
-      <div className="mb-6 flex gap-4 flex-wrap">
+      <div className="mb-6 flex gap-4 flex-wrap items-center">
         <input
           type="text"
           value={search}
@@ -146,12 +227,50 @@ function ManualCodesContent() {
             Manual
           </Link>
         </div>
-        <Link
-          href="/promos/create"
-          className="ml-auto px-4 py-2 bg-[#00843D] text-white rounded-lg text-sm font-medium hover:bg-[#006B32]"
-        >
-          + Create Code
-        </Link>
+        {/* Campaign Filter */}
+        {campaigns.length > 0 && (
+          <select
+            value={campaignFilter}
+            onChange={(e) => { setCampaignFilter(e.target.value); setPage(1); }}
+            className="px-4 py-2 border border-[#EBEBEB] rounded-lg focus:outline-none focus:border-[#00843D] text-sm"
+          >
+            <option value="">All Campaigns</option>
+            {campaigns.map((c) => (
+              <option key={c} value={c}>{c}</option>
+            ))}
+          </select>
+        )}
+        <div className="ml-auto flex gap-2">
+          {/* Export CSV Button */}
+          <button
+            onClick={handleExportCSV}
+            disabled={isExporting || codes.length === 0}
+            className="px-4 py-2 bg-white border border-[#EBEBEB] text-[#1A1A1A] rounded-lg text-sm font-medium hover:border-[#00843D] disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+          >
+            {isExporting ? (
+              <>
+                <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                </svg>
+                Exporting...
+              </>
+            ) : (
+              <>
+                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                Export CSV {totalCodes > 0 && `(${totalCodes})`}
+              </>
+            )}
+          </button>
+          <Link
+            href="/promos/create"
+            className="px-4 py-2 bg-[#00843D] text-white rounded-lg text-sm font-medium hover:bg-[#006B32]"
+          >
+            + Create Code
+          </Link>
+        </div>
       </div>
 
       {codes.length === 0 ? (
