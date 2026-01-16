@@ -1358,19 +1358,6 @@ function CreateListingContent() {
     }
   }, []);
 
-  // Apply welcome code and clear it from localStorage
-  const applyWelcomeCode = useCallback(() => {
-    if (welcomeCode) {
-      updateDraft({ promoCode: welcomeCode });
-      setWelcomeCode(null);
-      try {
-        localStorage.removeItem(WELCOME_CODE_KEY);
-      } catch {
-        // Ignore errors
-      }
-    }
-  }, [welcomeCode, updateDraft]);
-
   // Check URL for fresh=true to clear draft, or load from localStorage
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -1428,6 +1415,19 @@ function CreateListingContent() {
       return newErrors;
     });
   }, []);
+
+  // Apply welcome code and clear it from localStorage
+  const applyWelcomeCode = useCallback(() => {
+    if (welcomeCode) {
+      updateDraft({ promoCode: welcomeCode });
+      setWelcomeCode(null);
+      try {
+        localStorage.removeItem(WELCOME_CODE_KEY);
+      } catch {
+        // Ignore errors
+      }
+    }
+  }, [welcomeCode, updateDraft]);
 
   const validateDetails = useCallback((): boolean => {
     const newErrors: FormErrors = {};
