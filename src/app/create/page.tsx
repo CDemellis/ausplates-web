@@ -1054,6 +1054,8 @@ function Step3Pay({
   promoValidation,
   onApplyPromo,
   setPromoValidation,
+  welcomeCode,
+  onApplyWelcomeCode,
 }: {
   draft: ListingDraft;
   onChange: (updates: Partial<ListingDraft>) => void;
@@ -1070,6 +1072,8 @@ function Step3Pay({
   promoValidation: { valid: boolean; message: string } | null;
   onApplyPromo: () => void;
   setPromoValidation: (v: { valid: boolean; message: string } | null) => void;
+  welcomeCode: string | null;
+  onApplyWelcomeCode: () => void;
 }) {
   const borderClass = draft.boostType === '30day'
     ? 'border-[var(--gold)] shadow-lg shadow-amber-100'
@@ -1180,6 +1184,28 @@ function Step3Pay({
             <div className="flex justify-between">
               <span className="text-[var(--text-secondary)]">Offers</span>
               <span className="font-medium text-[var(--green)]">Open to offers</span>
+            </div>
+          )}
+
+          {/* Welcome Code Banner */}
+          {welcomeCode && !draft.promoCode && (
+            <div className="p-4 bg-gradient-to-r from-[var(--green)]/10 to-[var(--gold)]/10 border-2 border-[var(--green)] rounded-xl">
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <span className="text-2xl">🎁</span>
+                  <div>
+                    <p className="font-semibold text-[var(--text)]">Your Free Listing Code</p>
+                    <code className="text-sm font-mono text-[var(--green)]">{welcomeCode}</code>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={onApplyWelcomeCode}
+                  className="px-4 py-2 bg-[var(--green)] text-white font-medium rounded-lg hover:bg-[#006B31] transition-colors whitespace-nowrap"
+                >
+                  Apply Code
+                </button>
+              </div>
             </div>
           )}
 
@@ -1315,6 +1341,35 @@ function CreateListingContent() {
   // Promo validation state
   const [isValidatingPromo, setIsValidatingPromo] = useState(false);
   const [promoValidation, setPromoValidation] = useState<{ valid: boolean; message: string } | null>(null);
+
+  // Welcome promo code from email verification
+  const [welcomeCode, setWelcomeCode] = useState<string | null>(null);
+  const WELCOME_CODE_KEY = 'ausplates_welcome_code';
+
+  // Load welcome code from localStorage
+  useEffect(() => {
+    try {
+      const code = localStorage.getItem(WELCOME_CODE_KEY);
+      if (code) {
+        setWelcomeCode(code);
+      }
+    } catch {
+      // localStorage may be unavailable
+    }
+  }, []);
+
+  // Apply welcome code and clear it from localStorage
+  const applyWelcomeCode = useCallback(() => {
+    if (welcomeCode) {
+      updateDraft({ promoCode: welcomeCode });
+      setWelcomeCode(null);
+      try {
+        localStorage.removeItem(WELCOME_CODE_KEY);
+      } catch {
+        // Ignore errors
+      }
+    }
+  }, [welcomeCode, updateDraft]);
 
   // Check URL for fresh=true to clear draft, or load from localStorage
   useEffect(() => {
@@ -1630,6 +1685,8 @@ function CreateListingContent() {
             promoValidation={promoValidation}
             onApplyPromo={handleApplyPromo}
             setPromoValidation={setPromoValidation}
+            welcomeCode={welcomeCode}
+            onApplyWelcomeCode={applyWelcomeCode}
           />
         )}
       </main>
