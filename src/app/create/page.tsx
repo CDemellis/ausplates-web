@@ -1356,12 +1356,15 @@ function CreateListingContent() {
 
   // Fetch user's promo code from API when authenticated
   useEffect(() => {
-    if (!accessToken) return;
+    if (!isAuthenticated) return;
 
     const fetchPromoCode = async () => {
       setIsLoadingPromoCode(true);
       try {
-        const promoData = await getUserPromoCode(accessToken);
+        const token = await getAccessToken();
+        if (!token) return;
+
+        const promoData = await getUserPromoCode(token);
         if (promoData?.code) {
           setWelcomeCode(promoData.code);
         }
@@ -1373,7 +1376,7 @@ function CreateListingContent() {
     };
 
     fetchPromoCode();
-  }, [accessToken]);
+  }, [isAuthenticated, getAccessToken]);
 
   // Check URL for fresh=true to clear draft, or load from localStorage
   useEffect(() => {
