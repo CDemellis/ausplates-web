@@ -1212,9 +1212,10 @@ function ModerationTab() {
         return;
       }
 
-      await bulkUpdateReportStatus(token, Array.from(selectedRows), 'resolve');
+      await bulkUpdateReportStatus(token, Array.from(selectedRows), 'resolve', note);
       setIsResolveModalOpen(false);
       setSelectedRows(new Set());
+      setSelectedReport(null); // Clear selected report if coming from quick action
       await loadReports();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to resolve reports');
@@ -1235,9 +1236,10 @@ function ModerationTab() {
         return;
       }
 
-      await bulkUpdateReportStatus(token, Array.from(selectedRows), 'dismiss');
+      await bulkUpdateReportStatus(token, Array.from(selectedRows), 'dismiss', undefined, reason);
       setIsDismissModalOpen(false);
       setSelectedRows(new Set());
+      setSelectedReport(null); // Clear selected report if coming from quick action
       await loadReports();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to dismiss reports');
@@ -1316,28 +1318,20 @@ function ModerationTab() {
     }
   };
 
-  const handleQuickResolve = async () => {
+  const handleQuickResolve = () => {
     if (!selectedReport) return;
-    await bulkUpdateReportStatus(
-      await getAccessToken(),
-      [selectedReport.id],
-      'resolve'
-    );
+    // Close details modal and open resolve modal with single report selected
     setIsDetailsModalOpen(false);
-    setSelectedReport(null);
-    await loadReports();
+    setSelectedRows(new Set([selectedReport.id]));
+    setIsResolveModalOpen(true);
   };
 
-  const handleQuickDismiss = async () => {
+  const handleQuickDismiss = () => {
     if (!selectedReport) return;
-    await bulkUpdateReportStatus(
-      await getAccessToken(),
-      [selectedReport.id],
-      'dismiss'
-    );
+    // Close details modal and open dismiss modal with single report selected
     setIsDetailsModalOpen(false);
-    setSelectedReport(null);
-    await loadReports();
+    setSelectedRows(new Set([selectedReport.id]));
+    setIsDismissModalOpen(true);
   };
 
   const columns = [
