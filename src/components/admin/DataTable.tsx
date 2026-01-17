@@ -21,6 +21,9 @@ interface DataTableProps {
     totalPages: number;
   };
   onPageChange?: (page: number) => void;
+  selectedRows?: Set<string>;
+  onSelectRow?: (id: string) => void;
+  onSelectAll?: (selectAll: boolean) => void;
 }
 
 export function DataTable({
@@ -32,13 +35,24 @@ export function DataTable({
   onSort,
   pagination,
   onPageChange,
+  selectedRows = new Set(),
+  onSelectRow,
+  onSelectAll,
 }: DataTableProps) {
+  const hasSelection = onSelectRow && onSelectAll;
+  const allSelected = hasSelection && data.length > 0 && data.every((item) => selectedRows.has(item.id));
+  const someSelected = hasSelection && selectedRows.size > 0 && !allSelected;
   if (isLoading) {
     return (
       <div className="bg-white border border-[#EBEBEB] rounded-lg overflow-hidden">
         <table className="w-full">
           <thead className="bg-[#F8F8F8] border-b border-[#EBEBEB]">
             <tr>
+              {hasSelection && (
+                <th className="px-4 py-3 w-12">
+                  <div className="h-4 bg-[#F8F8F8] rounded w-4"></div>
+                </th>
+              )}
               {columns.map((col) => (
                 <th key={String(col.key)} className="px-4 py-3 text-left text-xs font-semibold text-[#666666]">
                   {col.label}
@@ -49,6 +63,11 @@ export function DataTable({
           <tbody>
             {[...Array(5)].map((_, i) => (
               <tr key={i} className="border-b border-[#EBEBEB] animate-pulse">
+                {hasSelection && (
+                  <td className="px-4 py-3">
+                    <div className="h-4 bg-[#F8F8F8] rounded w-4"></div>
+                  </td>
+                )}
                 {columns.map((col) => (
                   <td key={String(col.key)} className="px-4 py-3">
                     <div className="h-4 bg-[#F8F8F8] rounded w-3/4"></div>
@@ -79,6 +98,22 @@ export function DataTable({
           <table className="w-full">
             <thead className="bg-[#F8F8F8] border-b border-[#EBEBEB]">
               <tr>
+                {hasSelection && (
+                  <th className="px-4 py-3 w-12">
+                    <input
+                      type="checkbox"
+                      checked={allSelected}
+                      ref={(input) => {
+                        if (input) {
+                          input.indeterminate = someSelected;
+                        }
+                      }}
+                      onChange={(e) => onSelectAll(e.target.checked)}
+                      className="w-4 h-4 text-[#00843D] border-[#EBEBEB] rounded focus:ring-[#00843D] focus:ring-2"
+                      aria-label="Select all listings"
+                    />
+                  </th>
+                )}
                 {columns.map((col) => (
                   <th
                     key={String(col.key)}
@@ -105,8 +140,19 @@ export function DataTable({
                   key={listing.id}
                   className={`border-b border-[#EBEBEB] hover:bg-[#F8F8F8] transition-colors ${
                     idx === data.length - 1 ? 'border-b-0' : ''
-                  }`}
+                  } ${selectedRows.has(listing.id) ? 'bg-[#F0F9F4]' : ''}`}
                 >
+                  {hasSelection && (
+                    <td className="px-4 py-3">
+                      <input
+                        type="checkbox"
+                        checked={selectedRows.has(listing.id)}
+                        onChange={() => onSelectRow(listing.id)}
+                        className="w-4 h-4 text-[#00843D] border-[#EBEBEB] rounded focus:ring-[#00843D] focus:ring-2"
+                        aria-label={`Select listing ${listing.combination}`}
+                      />
+                    </td>
+                  )}
                   {columns.map((col) => (
                     <td key={String(col.key)} className="px-4 py-3 text-sm text-[#1A1A1A]">
                       {col.render ? col.render(listing) : listing[col.key as keyof AdminListing]}

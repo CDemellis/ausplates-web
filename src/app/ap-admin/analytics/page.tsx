@@ -8,10 +8,15 @@ import {
   getAdminListings,
   ListingsResponse,
   ListingsFilters,
+  bulkDeleteListings,
+  bulkUpdateListingStatus,
+  AdminListing,
 } from '@/lib/api';
 import { KPICard } from '@/components/admin/KPICard';
 import { FilterPanel } from '@/components/admin/FilterPanel';
 import { DataTable } from '@/components/admin/DataTable';
+import { BulkActionBar } from '@/components/admin/BulkActionBar';
+import { ConfirmModal } from '@/components/admin/ConfirmModal';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 
 type TabKey = 'overview' | 'users' | 'listings' | 'performance' | 'moderation' | 'system';
@@ -267,6 +272,10 @@ function ListingsTab() {
     sortBy: 'created_at',
     sortDirection: 'desc',
   });
+  const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
+  const [isPerformingAction, setIsPerformingAction] = useState(false);
   const hasLoaded = useRef(false);
 
   const loadListings = useCallback(async () => {
@@ -338,6 +347,102 @@ function ListingsTab() {
 
   const handlePageChange = (page: number) => {
     setFilters((prev) => ({ ...prev, page }));
+  };
+
+  const handleSelectRow = (id: string) => {
+    setSelectedRows((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(id)) {
+        newSet.delete(id);
+      } else {
+        newSet.add(id);
+      }
+      return newSet;
+    });
+  };
+
+  const handleSelectAll = (selectAll: boolean) => {
+    if (selectAll) {
+      setSelectedRows(new Set(data?.listings.map((l) => l.id) || []));
+    } else {
+      setSelectedRows(new Set());
+    }
+  };
+
+  const handleClearSelection = () => {
+    setSelectedRows(new Set());
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedRows.size === 0) return;
+
+    try {
+      setIsPerformingAction(true);
+      const token = await getAccessToken();
+      if (!token) {
+        setError('Not authenticated');
+        return;
+      }
+
+      await bulkDeleteListings(token, Array.from(selectedRows));
+      setIsDeleteModalOpen(false);
+      setSelectedRows(new Set());
+      await loadListings();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete listings');
+      console.error('Failed to bulk delete:', err);
+    } finally {
+      setIsPerformingAction(false);
+    }
+  };
+
+  const handleBulkStatusChange = async (status: string) => {
+    if (selectedRows.size === 0) return;
+
+    try {
+      setIsPerformingAction(true);
+      const token = await getAccessToken();
+      if (!token) {
+        setError('Not authenticated');
+        return;
+      }
+
+      await bulkUpdateListingStatus(token, Array.from(selectedRows), status);
+      setIsStatusModalOpen(false);
+      setSelectedRows(new Set());
+      await loadListings();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to update listings');
+      console.error('Failed to bulk update:', err);
+    } finally {
+      setIsPerformingAction(false);
+    }
+  };
+
+  const handleExportCSV = () => {
+    if (!data || selectedRows.size === 0) return;
+
+    const selectedListings = data.listings.filter((l) => selectedRows.has(l.id));
+    const headers = ['Combination', 'State', 'Type', 'Price', 'Status', 'Views', 'Owner Email', 'Created'];
+    const rows = selectedListings.map((l) => [
+      l.combination,
+      l.state,
+      l.plateType,
+      (l.price / 100).toFixed(2),
+      l.status,
+      l.viewsCount.toString(),
+      l.ownerEmail,
+      new Date(l.createdAt).toLocaleDateString('en-AU'),
+    ]);
+
+    const csv = [headers.join(','), ...rows.map((row) => row.join(','))].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `listings-${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   const columns = [
@@ -464,6 +569,44 @@ function ListingsTab() {
         onSort={handleSort}
         pagination={data?.pagination}
         onPageChange={handlePageChange}
+        selectedRows={selectedRows}
+        onSelectRow={handleSelectRow}
+        onSelectAll={handleSelectAll}
+      />
+
+      {/* Bulk Action Bar */}
+      <BulkActionBar
+        selectedCount={selectedRows.size}
+        onChangeStatus={() => setIsStatusModalOpen(true)}
+        onExportCSV={handleExportCSV}
+        onDelete={() => setIsDeleteModalOpen(true)}
+        onClearSelection={handleClearSelection}
+      />
+
+      {/* Delete Confirmation Modal */}
+      <ConfirmModal
+        isOpen={isDeleteModalOpen}
+        title="Delete Listings"
+        message={`Are you sure you want to delete ${selectedRows.size} ${selectedRows.size === 1 ? 'listing' : 'listings'}? This action cannot be undone.`}
+        confirmText="Delete"
+        cancelText="Cancel"
+        confirmVariant="danger"
+        onConfirm={handleBulkDelete}
+        onCancel={() => setIsDeleteModalOpen(false)}
+        isLoading={isPerformingAction}
+      />
+
+      {/* Status Change Modal */}
+      <ConfirmModal
+        isOpen={isStatusModalOpen}
+        title="Change Status"
+        message={`Select a new status for ${selectedRows.size} ${selectedRows.size === 1 ? 'listing' : 'listings'}:`}
+        confirmText="Update"
+        cancelText="Cancel"
+        confirmVariant="primary"
+        onConfirm={() => handleBulkStatusChange('active')}
+        onCancel={() => setIsStatusModalOpen(false)}
+        isLoading={isPerformingAction}
       />
     </div>
   );

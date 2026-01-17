@@ -2259,3 +2259,50 @@ export async function getAdminListings(
   const data = await res.json();
   return data;
 }
+
+export async function bulkDeleteListings(
+  accessToken: string,
+  listingIds: string[]
+): Promise<{ success: boolean; deletedCount: number }> {
+  const url = `${API_BASE_URL}/api/admin/analytics/listings/bulk`;
+
+  const res = await fetchWithRetry(url, {
+    method: 'DELETE',
+    headers: {
+      'Authorization': `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ listingIds }),
+  });
+
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.error || 'Failed to delete listings');
+  }
+
+  return res.json();
+}
+
+export async function bulkUpdateListingStatus(
+  accessToken: string,
+  listingIds: string[],
+  status: string
+): Promise<{ success: boolean; updatedCount: number }> {
+  const url = `${API_BASE_URL}/api/admin/analytics/listings/bulk`;
+
+  const res = await fetchWithRetry(url, {
+    method: 'PATCH',
+    headers: {
+      'Authorization': `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ listingIds, status }),
+  });
+
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.error || 'Failed to update listings');
+  }
+
+  return res.json();
+}
