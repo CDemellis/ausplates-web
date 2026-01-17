@@ -10,6 +10,7 @@ import {
   ListingsFilters,
 } from '@/lib/api';
 import { KPICard } from '@/components/admin/KPICard';
+import { FilterPanel } from '@/components/admin/FilterPanel';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 
 type TabKey = 'overview' | 'users' | 'listings' | 'performance' | 'moderation' | 'system';
@@ -362,11 +363,17 @@ function ListingsTab() {
         />
       </div>
 
+      {/* Filters */}
+      <FilterPanel
+        filters={filters}
+        onFilterChange={setFilters}
+      />
+
       {/* Listings Table Placeholder */}
       <div className="bg-white border border-[#EBEBEB] rounded-lg p-6">
         <h3 className="text-sm font-semibold text-[#1A1A1A] mb-4">Listings Table</h3>
         <div className="text-[#666666] text-sm">
-          <p>Filters, table, and bulk actions coming next...</p>
+          <p>Table and bulk actions coming next...</p>
           {data && (
             <p className="mt-2">
               Found {data.pagination.total} listings (page {data.pagination.page} of {data.pagination.totalPages})
