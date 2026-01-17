@@ -1,16 +1,17 @@
-import { AdminListing } from '@/lib/api';
+// Generic type constraint: must have an 'id' property
+type DataWithId = { id: string; [key: string]: any };
 
-interface Column {
-  key: keyof AdminListing | 'actions';
+export interface Column<T extends DataWithId> {
+  key: keyof T | 'actions';
   label: string;
   sortable?: boolean;
-  render?: (listing: AdminListing) => React.ReactNode;
+  render?: (item: T) => React.ReactNode;
 }
 
-interface DataTableProps {
-  data: AdminListing[];
+interface DataTableProps<T extends DataWithId> {
+  data: T[];
   isLoading: boolean;
-  columns: Column[];
+  columns: Column<T>[];
   sortBy?: string;
   sortDirection?: 'asc' | 'desc';
   onSort?: (column: string) => void;
@@ -24,9 +25,13 @@ interface DataTableProps {
   selectedRows?: Set<string>;
   onSelectRow?: (id: string) => void;
   onSelectAll?: (selectAll: boolean) => void;
+  emptyMessage?: {
+    title: string;
+    description: string;
+  };
 }
 
-export function DataTable({
+export function DataTable<T extends DataWithId>({
   data,
   isLoading,
   columns,
@@ -38,7 +43,11 @@ export function DataTable({
   selectedRows = new Set(),
   onSelectRow,
   onSelectAll,
-}: DataTableProps) {
+  emptyMessage = {
+    title: 'No results found',
+    description: 'Try adjusting your filters to see more results.',
+  },
+}: DataTableProps<T>) {
   const hasSelection = onSelectRow && onSelectAll;
   const allSelected = hasSelection && data.length > 0 && data.every((item) => selectedRows.has(item.id));
   const someSelected = hasSelection && selectedRows.size > 0 && !allSelected;
@@ -85,8 +94,8 @@ export function DataTable({
     return (
       <div className="bg-white border border-[#EBEBEB] rounded-lg p-12 text-center">
         <div className="text-4xl mb-4">📋</div>
-        <h3 className="text-lg font-semibold text-[#1A1A1A] mb-2">No listings found</h3>
-        <p className="text-[#666666]">Try adjusting your filters to see more results.</p>
+        <h3 className="text-lg font-semibold text-[#1A1A1A] mb-2">{emptyMessage.title}</h3>
+        <p className="text-[#666666]">{emptyMessage.description}</p>
       </div>
     );
   }
@@ -105,12 +114,12 @@ export function DataTable({
                       checked={allSelected}
                       ref={(input) => {
                         if (input) {
-                          input.indeterminate = someSelected;
+                          input.indeterminate = someSelected || false;
                         }
                       }}
-                      onChange={(e) => onSelectAll(e.target.checked)}
+                      onChange={(e) => onSelectAll?.(e.target.checked)}
                       className="w-4 h-4 text-[#00843D] border-[#EBEBEB] rounded focus:ring-[#00843D] focus:ring-2"
-                      aria-label="Select all listings"
+                      aria-label="Select all items"
                     />
                   </th>
                 )}
@@ -135,27 +144,27 @@ export function DataTable({
               </tr>
             </thead>
             <tbody>
-              {data.map((listing, idx) => (
+              {data.map((item, idx) => (
                 <tr
-                  key={listing.id}
+                  key={item.id}
                   className={`border-b border-[#EBEBEB] hover:bg-[#F8F8F8] transition-colors ${
                     idx === data.length - 1 ? 'border-b-0' : ''
-                  } ${selectedRows.has(listing.id) ? 'bg-[#F0F9F4]' : ''}`}
+                  } ${selectedRows.has(item.id) ? 'bg-[#F0F9F4]' : ''}`}
                 >
                   {hasSelection && (
                     <td className="px-4 py-3">
                       <input
                         type="checkbox"
-                        checked={selectedRows.has(listing.id)}
-                        onChange={() => onSelectRow(listing.id)}
+                        checked={selectedRows.has(item.id)}
+                        onChange={() => onSelectRow?.(item.id)}
                         className="w-4 h-4 text-[#00843D] border-[#EBEBEB] rounded focus:ring-[#00843D] focus:ring-2"
-                        aria-label={`Select listing ${listing.combination}`}
+                        aria-label={`Select item ${item.id}`}
                       />
                     </td>
                   )}
                   {columns.map((col) => (
                     <td key={String(col.key)} className="px-4 py-3 text-sm text-[#1A1A1A]">
-                      {col.render ? col.render(listing) : listing[col.key as keyof AdminListing]}
+                      {col.render ? col.render(item) : item[col.key as keyof T]}
                     </td>
                   ))}
                 </tr>

@@ -39,7 +39,7 @@ import { KPICard } from '@/components/admin/KPICard';
 import { FilterPanel } from '@/components/admin/FilterPanel';
 import { UsersFilterPanel } from '@/components/admin/UsersFilterPanel';
 import { ModerationFilterPanel } from '@/components/admin/ModerationFilterPanel';
-import { DataTable } from '@/components/admin/DataTable';
+import { DataTable, Column } from '@/components/admin/DataTable';
 import { BulkActionBar } from '@/components/admin/BulkActionBar';
 import { ConfirmModal } from '@/components/admin/ConfirmModal';
 import { EmailNotificationModal } from '@/components/admin/EmailNotificationModal';
@@ -474,7 +474,7 @@ function ListingsTab() {
     URL.revokeObjectURL(url);
   };
 
-  const columns = [
+  const columns: Column<AdminListing>[] = [
     {
       key: 'combination' as const,
       label: 'Combination',
@@ -589,7 +589,7 @@ function ListingsTab() {
       />
 
       {/* Listings Table */}
-      <DataTable
+      <DataTable<AdminListing>
         data={data?.listings ?? []}
         isLoading={isLoading}
         columns={columns}
@@ -601,6 +601,10 @@ function ListingsTab() {
         selectedRows={selectedRows}
         onSelectRow={handleSelectRow}
         onSelectAll={handleSelectAll}
+        emptyMessage={{
+          title: 'No listings found',
+          description: 'Try adjusting your filters to see more results.',
+        }}
       />
 
       {/* Bulk Action Bar */}
@@ -883,7 +887,7 @@ function UsersTab() {
     URL.revokeObjectURL(url);
   };
 
-  const columns = [
+  const columns: Column<AdminUser>[] = [
     {
       key: 'email' as const,
       label: 'Email',
@@ -996,7 +1000,7 @@ function UsersTab() {
       />
 
       {/* Users Table */}
-      <DataTable
+      <DataTable<AdminUser>
         data={data?.users ?? []}
         isLoading={isLoading}
         columns={columns}
@@ -1008,6 +1012,10 @@ function UsersTab() {
         selectedRows={selectedRows}
         onSelectRow={handleSelectRow}
         onSelectAll={handleSelectAll}
+        emptyMessage={{
+          title: 'No users found',
+          description: 'Try adjusting your filters to see more results.',
+        }}
       />
 
       {/* Bulk Action Bar */}
@@ -1343,7 +1351,7 @@ function ModerationTab() {
     setIsDismissModalOpen(true);
   };
 
-  const columns = [
+  const columns: Column<AdminReport>[] = [
     {
       key: 'id' as const,
       label: 'Report ID',
@@ -1474,7 +1482,7 @@ function ModerationTab() {
       />
 
       {/* Reports Table */}
-      <DataTable
+      <DataTable<AdminReport>
         data={data?.reports ?? []}
         isLoading={isLoading}
         columns={columns}
@@ -1486,6 +1494,10 @@ function ModerationTab() {
         selectedRows={selectedRows}
         onSelectRow={handleSelectRow}
         onSelectAll={handleSelectAll}
+        emptyMessage={{
+          title: 'No reports found',
+          description: 'Try adjusting your filters to see more results.',
+        }}
       />
 
       {/* Bulk Action Bar */}
