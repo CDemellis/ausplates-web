@@ -15,6 +15,9 @@ import {
   UsersResponse,
   UsersFilters,
   AdminUser,
+  bulkDeleteUsers,
+  bulkUpdateUserStatus,
+  sendBulkNotification,
 } from '@/lib/api';
 import { KPICard } from '@/components/admin/KPICard';
 import { FilterPanel } from '@/components/admin/FilterPanel';
@@ -22,6 +25,7 @@ import { UsersFilterPanel } from '@/components/admin/UsersFilterPanel';
 import { DataTable } from '@/components/admin/DataTable';
 import { BulkActionBar } from '@/components/admin/BulkActionBar';
 import { ConfirmModal } from '@/components/admin/ConfirmModal';
+import { EmailNotificationModal } from '@/components/admin/EmailNotificationModal';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 
 type TabKey = 'overview' | 'users' | 'listings' | 'performance' | 'moderation' | 'system';
@@ -628,6 +632,12 @@ function UsersTab() {
     sortBy: 'created_at',
     sortDirection: 'desc',
   });
+  const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [isBanModalOpen, setIsBanModalOpen] = useState(false);
+  const [isUnbanModalOpen, setIsUnbanModalOpen] = useState(false);
+  const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
+  const [isPerformingAction, setIsPerformingAction] = useState(false);
   const hasLoaded = useRef(false);
 
   const loadUsers = useCallback(async () => {
@@ -710,6 +720,147 @@ function UsersTab() {
 
   const handlePageChange = (page: number) => {
     setFilters((prev) => ({ ...prev, page }));
+  };
+
+  const handleSelectRow = (id: string) => {
+    setSelectedRows((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(id)) {
+        newSet.delete(id);
+      } else {
+        newSet.add(id);
+      }
+      return newSet;
+    });
+  };
+
+  const handleSelectAll = (selectAll: boolean) => {
+    if (selectAll) {
+      setSelectedRows(new Set(data?.users.map((u) => u.id) || []));
+    } else {
+      setSelectedRows(new Set());
+    }
+  };
+
+  const handleClearSelection = () => {
+    setSelectedRows(new Set());
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedRows.size === 0) return;
+
+    try {
+      setIsPerformingAction(true);
+      const token = await getAccessToken();
+      if (!token) {
+        setError('Not authenticated');
+        return;
+      }
+
+      await bulkDeleteUsers(token, Array.from(selectedRows));
+      setIsDeleteModalOpen(false);
+      setSelectedRows(new Set());
+      await loadUsers();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete users');
+      console.error('Failed to bulk delete users:', err);
+    } finally {
+      setIsPerformingAction(false);
+    }
+  };
+
+  const handleBulkBan = async () => {
+    if (selectedRows.size === 0) return;
+
+    try {
+      setIsPerformingAction(true);
+      const token = await getAccessToken();
+      if (!token) {
+        setError('Not authenticated');
+        return;
+      }
+
+      await bulkUpdateUserStatus(token, Array.from(selectedRows), 'ban');
+      setIsBanModalOpen(false);
+      setSelectedRows(new Set());
+      await loadUsers();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to ban users');
+      console.error('Failed to bulk ban users:', err);
+    } finally {
+      setIsPerformingAction(false);
+    }
+  };
+
+  const handleBulkUnban = async () => {
+    if (selectedRows.size === 0) return;
+
+    try {
+      setIsPerformingAction(true);
+      const token = await getAccessToken();
+      if (!token) {
+        setError('Not authenticated');
+        return;
+      }
+
+      await bulkUpdateUserStatus(token, Array.from(selectedRows), 'unban');
+      setIsUnbanModalOpen(false);
+      setSelectedRows(new Set());
+      await loadUsers();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to unban users');
+      console.error('Failed to bulk unban users:', err);
+    } finally {
+      setIsPerformingAction(false);
+    }
+  };
+
+  const handleSendNotification = async (subject: string, message: string) => {
+    if (selectedRows.size === 0) return;
+
+    try {
+      setIsPerformingAction(true);
+      const token = await getAccessToken();
+      if (!token) {
+        setError('Not authenticated');
+        return;
+      }
+
+      await sendBulkNotification(token, Array.from(selectedRows), subject, message);
+      setIsEmailModalOpen(false);
+      setSelectedRows(new Set());
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to send notifications');
+      console.error('Failed to send notifications:', err);
+    } finally {
+      setIsPerformingAction(false);
+    }
+  };
+
+  const handleExportCSV = () => {
+    if (!data || selectedRows.size === 0) return;
+
+    const selectedUsers = data.users.filter((u) => selectedRows.has(u.id));
+    const headers = ['Email', 'Name', 'Created', 'Listings Count', 'Email Verified', 'Last Active', 'Status', 'Account Type'];
+    const rows = selectedUsers.map((u) => [
+      u.email,
+      u.fullName || '',
+      new Date(u.createdAt).toLocaleDateString('en-AU'),
+      u.listingsCount.toString(),
+      u.emailVerified ? 'Yes' : 'No',
+      u.lastSignInAt ? new Date(u.lastSignInAt).toLocaleDateString('en-AU') : 'Never',
+      u.status,
+      u.accountType,
+    ]);
+
+    const csv = [headers.join(','), ...rows.map((row) => row.map(field => `"${field}"`).join(','))].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `users-${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   const columns = [
@@ -834,6 +985,85 @@ function UsersTab() {
         onSort={handleSort}
         pagination={data?.pagination}
         onPageChange={handlePageChange}
+        selectedRows={selectedRows}
+        onSelectRow={handleSelectRow}
+        onSelectAll={handleSelectAll}
+      />
+
+      {/* Bulk Action Bar */}
+      <BulkActionBar
+        selectedCount={selectedRows.size}
+        onChangeStatus={() => {
+          // Check if any selected users are banned
+          const selectedUsers = data?.users.filter((u) => selectedRows.has(u.id)) || [];
+          const hasBannedUsers = selectedUsers.some((u) => u.status === 'banned');
+          const hasActiveBannedUsers = selectedUsers.some((u) => u.status !== 'banned');
+
+          // If mixed or all active, show ban modal
+          if (hasActiveBannedUsers) {
+            setIsBanModalOpen(true);
+          } else {
+            setIsUnbanModalOpen(true);
+          }
+        }}
+        onExportCSV={handleExportCSV}
+        onDelete={() => setIsDeleteModalOpen(true)}
+        onClearSelection={handleClearSelection}
+        customActions={[
+          {
+            label: 'Send Email',
+            onClick: () => setIsEmailModalOpen(true),
+            variant: 'primary' as const,
+          },
+        ]}
+      />
+
+      {/* Email Notification Modal */}
+      <EmailNotificationModal
+        isOpen={isEmailModalOpen}
+        selectedCount={selectedRows.size}
+        onSend={handleSendNotification}
+        onCancel={() => setIsEmailModalOpen(false)}
+        isLoading={isPerformingAction}
+      />
+
+      {/* Delete Confirmation Modal */}
+      <ConfirmModal
+        isOpen={isDeleteModalOpen}
+        title="Delete Users"
+        message={`Are you sure you want to delete ${selectedRows.size} ${selectedRows.size === 1 ? 'user' : 'users'}? This will soft delete the accounts and preserve data for audit purposes.`}
+        confirmText="Delete"
+        cancelText="Cancel"
+        confirmVariant="danger"
+        onConfirm={handleBulkDelete}
+        onCancel={() => setIsDeleteModalOpen(false)}
+        isLoading={isPerformingAction}
+      />
+
+      {/* Ban Confirmation Modal */}
+      <ConfirmModal
+        isOpen={isBanModalOpen}
+        title="Ban Users"
+        message={`Are you sure you want to ban ${selectedRows.size} ${selectedRows.size === 1 ? 'user' : 'users'}? Banned users cannot sign in to the platform.`}
+        confirmText="Ban Users"
+        cancelText="Cancel"
+        confirmVariant="danger"
+        onConfirm={handleBulkBan}
+        onCancel={() => setIsBanModalOpen(false)}
+        isLoading={isPerformingAction}
+      />
+
+      {/* Unban Confirmation Modal */}
+      <ConfirmModal
+        isOpen={isUnbanModalOpen}
+        title="Unban Users"
+        message={`Are you sure you want to unban ${selectedRows.size} ${selectedRows.size === 1 ? 'user' : 'users'}? They will be able to sign in again.`}
+        confirmText="Unban Users"
+        cancelText="Cancel"
+        confirmVariant="primary"
+        onConfirm={handleBulkUnban}
+        onCancel={() => setIsUnbanModalOpen(false)}
+        isLoading={isPerformingAction}
       />
     </div>
   );
