@@ -234,6 +234,25 @@ export function ReportDetailsModal({
               </div>
             )}
           </div>
+
+          {/* Resolution/Dismissal Information */}
+          {(report.resolutionNote || report.dismissedReason) && (
+            <div className="border border-[#EBEBEB] rounded-lg p-4 bg-[#F8F8F8]">
+              <div className="flex items-start justify-between mb-2">
+                <h3 className="text-xs font-semibold text-[#666666]">
+                  {report.resolutionNote ? 'Resolution Note' : 'Dismissal Reason'}
+                </h3>
+                {report.resolvedByAdminEmail && (
+                  <span className="text-xs text-[#666666]">
+                    by {report.resolvedByAdminEmail}
+                  </span>
+                )}
+              </div>
+              <p className="text-sm text-[#1A1A1A] whitespace-pre-wrap">
+                {report.resolutionNote || report.dismissedReason}
+              </p>
+            </div>
+          )}
         </div>
 
         {/* Actions */}
