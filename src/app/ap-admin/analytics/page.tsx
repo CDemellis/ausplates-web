@@ -28,6 +28,7 @@ import {
 import { KPICard } from '@/components/admin/KPICard';
 import { FilterPanel } from '@/components/admin/FilterPanel';
 import { UsersFilterPanel } from '@/components/admin/UsersFilterPanel';
+import { ModerationFilterPanel } from '@/components/admin/ModerationFilterPanel';
 import { DataTable } from '@/components/admin/DataTable';
 import { BulkActionBar } from '@/components/admin/BulkActionBar';
 import { ConfirmModal } from '@/components/admin/ConfirmModal';
@@ -1275,6 +1276,12 @@ function ModerationTab() {
           error={error ? 'Error' : undefined}
         />
       </div>
+
+      {/* Filters */}
+      <ModerationFilterPanel
+        filters={filters}
+        onFilterChange={setFilters}
+      />
 
       {/* Reports Table */}
       <DataTable
