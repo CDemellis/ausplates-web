@@ -234,21 +234,25 @@ function OverviewTab() {
               label="Active Listings"
               value={metrics.health.breakdown.activeListings}
               weight={30}
+              description="Percentage of listings currently active vs sold/expired. Higher is better for marketplace inventory."
             />
             <HealthMetric
               label="Email Verification"
               value={metrics.health.breakdown.emailVerification}
               weight={25}
+              description="Percentage of users who have verified their email address. Critical for trust and communication."
             />
             <HealthMetric
               label="Recent Activity"
               value={metrics.health.breakdown.recentActivity}
               weight={25}
+              description="Users who logged in within the last 30 days. Indicates platform engagement and retention."
             />
             <HealthMetric
               label="Report Resolution"
               value={metrics.health.breakdown.reportResolution}
               weight={20}
+              description="Percentage of reports that have been resolved or dismissed. Shows moderation effectiveness."
             />
           </div>
         </div>
@@ -257,7 +261,7 @@ function OverviewTab() {
   );
 }
 
-function HealthMetric({ label, value, weight }: { label: string; value: number; weight: number }) {
+function HealthMetric({ label, value, weight, description }: { label: string; value: number; weight: number; description?: string }) {
   return (
     <div>
       <div className="flex justify-between text-sm mb-1">
@@ -271,6 +275,9 @@ function HealthMetric({ label, value, weight }: { label: string; value: number; 
         />
       </div>
       <div className="text-xs text-[#999999] mt-1">Weight: {weight}%</div>
+      {description && (
+        <p className="text-xs text-[#999999] mt-2 leading-relaxed">{description}</p>
+      )}
     </div>
   );
 }
