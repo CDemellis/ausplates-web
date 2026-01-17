@@ -1,7 +1,7 @@
 interface KPICardProps {
   label: string;
   value: string | number;
-  subtitle?: string;
+  subtitle?: string | React.ReactNode;
   trend?: {
     value: number;
     isPositive: boolean;
