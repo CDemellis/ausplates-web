@@ -2466,3 +2466,165 @@ export async function sendBulkNotification(
 
   return res.json();
 }
+
+// ============================================================================
+// Admin Reports Management
+// ============================================================================
+
+export interface AdminReport {
+  id: string;
+  reportReason: 'inappropriate_content' | 'suspected_fraud' | 'incorrect_information' | 'already_sold' | 'other';
+  status: 'pending' | 'reviewed' | 'resolved' | 'dismissed';
+  reporterEmail: string;
+  reporterId: string;
+  reportedContentType: 'listing';
+  reportedContentId: string;
+  reportedContentPreview: string;
+  reason: string;
+  createdAt: string;
+  reviewedAt: string | null;
+}
+
+export interface ReportsSummary {
+  total: number;
+  pending: number;
+  under_review: number;
+  resolved: number;
+  dismissed: number;
+  resolutionRate: number;
+  avgResolutionTimeHours: number;
+  typeBreakdown: {
+    inappropriate_content: number;
+    suspected_fraud: number;
+    incorrect_information: number;
+    already_sold: number;
+    other: number;
+  };
+}
+
+export interface ReportsFilters {
+  status?: 'pending' | 'reviewed' | 'resolved' | 'dismissed';
+  report_reason?: 'inappropriate_content' | 'suspected_fraud' | 'incorrect_information' | 'already_sold' | 'other';
+  reporter_email?: string;
+  reported_content?: string;
+  date_from?: string;
+  date_to?: string;
+  page: number;
+  limit: number;
+  sortBy: string;
+  sortDirection: 'asc' | 'desc';
+}
+
+export interface ReportsResponse {
+  reports: AdminReport[];
+  summary: ReportsSummary;
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+}
+
+export interface ReportDetail extends AdminReport {
+  reporterName: string | null;
+  reportedContentFull: {
+    combination: string;
+    state: string;
+    plateType: string;
+    price: number;
+    description: string;
+    status: string;
+    ownerEmail: string;
+    ownerName: string | null;
+  } | null;
+  resolutionNote: string | null;
+  resolvedByAdminId: string | null;
+  dismissedReason: string | null;
+}
+
+export async function getAdminReports(token: string, filters: ReportsFilters): Promise<ReportsResponse> {
+  const params = new URLSearchParams();
+
+  if (filters.status) params.append('status', filters.status);
+  if (filters.report_reason) params.append('report_reason', filters.report_reason);
+  if (filters.reporter_email) params.append('reporter_email', filters.reporter_email);
+  if (filters.reported_content) params.append('reported_content', filters.reported_content);
+  if (filters.date_from) params.append('date_from', filters.date_from);
+  if (filters.date_to) params.append('date_to', filters.date_to);
+  params.append('page', filters.page.toString());
+  params.append('limit', filters.limit.toString());
+  params.append('sort_by', filters.sortBy);
+  params.append('sort_direction', filters.sortDirection);
+
+  const res = await fetch(`${API_BASE_URL}/admin/analytics/reports?${params}`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.error || 'Failed to fetch reports');
+  }
+
+  return res.json();
+}
+
+export async function getReportDetail(token: string, reportId: string): Promise<ReportDetail> {
+  const res = await fetch(`${API_BASE_URL}/admin/analytics/reports/${reportId}`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.error || 'Failed to fetch report detail');
+  }
+
+  return res.json();
+}
+
+export async function bulkUpdateReportStatus(
+  token: string,
+  reportIds: string[],
+  action: 'resolve' | 'review' | 'dismiss'
+): Promise<{ success: boolean; updatedCount: number }> {
+  const res = await fetch(`${API_BASE_URL}/admin/analytics/reports/bulk`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ reportIds, action }),
+  });
+
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.error || 'Failed to update reports');
+  }
+
+  return res.json();
+}
+
+export async function bulkDeleteReports(
+  token: string,
+  reportIds: string[]
+): Promise<{ success: boolean; deletedCount: number }> {
+  const res = await fetch(`${API_BASE_URL}/admin/analytics/reports/bulk`, {
+    method: 'DELETE',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ reportIds }),
+  });
+
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.error || 'Failed to delete reports');
+  }
+
+  return res.json();
+}

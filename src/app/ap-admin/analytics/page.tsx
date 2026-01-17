@@ -18,6 +18,12 @@ import {
   bulkDeleteUsers,
   bulkUpdateUserStatus,
   sendBulkNotification,
+  getAdminReports,
+  ReportsResponse,
+  ReportsFilters,
+  AdminReport,
+  bulkUpdateReportStatus,
+  bulkDeleteReports,
 } from '@/lib/api';
 import { KPICard } from '@/components/admin/KPICard';
 import { FilterPanel } from '@/components/admin/FilterPanel';
@@ -35,7 +41,7 @@ const TABS = [
   { key: 'users' as TabKey, label: 'Users', enabled: true },
   { key: 'listings' as TabKey, label: 'Listings', enabled: true },
   { key: 'performance' as TabKey, label: 'Performance', enabled: false },
-  { key: 'moderation' as TabKey, label: 'Moderation', enabled: false },
+  { key: 'moderation' as TabKey, label: 'Moderation', enabled: true },
   { key: 'system' as TabKey, label: 'System Health', enabled: false },
 ];
 
@@ -90,7 +96,7 @@ export default function AnalyticsPage() {
         {activeTab === 'users' && <UsersTab />}
         {activeTab === 'listings' && <ListingsTab />}
         {activeTab === 'performance' && <PlaceholderTab name="Performance" />}
-        {activeTab === 'moderation' && <PlaceholderTab name="Moderation" />}
+        {activeTab === 'moderation' && <ModerationTab />}
         {activeTab === 'system' && <PlaceholderTab name="System Health" />}
       </div>
       </div>
@@ -1064,6 +1070,222 @@ function UsersTab() {
         onConfirm={handleBulkUnban}
         onCancel={() => setIsUnbanModalOpen(false)}
         isLoading={isPerformingAction}
+      />
+    </div>
+  );
+}
+
+function ModerationTab() {
+  const { getAccessToken } = useAuth();
+  const [data, setData] = useState<ReportsResponse | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string>('');
+  const [filters, setFilters] = useState<ReportsFilters>({
+    page: 1,
+    limit: 50,
+    sortBy: 'created_at',
+    sortDirection: 'desc',
+  });
+  const hasLoaded = useRef(false);
+
+  const loadReports = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      setError('');
+      const token = await getAccessToken();
+      if (!token) {
+        setError('Not authenticated');
+        return;
+      }
+
+      const response = await getAdminReports(token, filters);
+      setData(response);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load reports');
+      console.error('Failed to load reports:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [getAccessToken, filters]);
+
+  useEffect(() => {
+    if (hasLoaded.current) return;
+    hasLoaded.current = true;
+    loadReports();
+  }, [loadReports]);
+
+  // Reload when filters change
+  useEffect(() => {
+    if (!hasLoaded.current) return;
+    loadReports();
+  }, [filters, loadReports]);
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-AU', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+    });
+  };
+
+  const getStatusBadge = (status: string) => {
+    const colors: Record<string, string> = {
+      pending: 'bg-[#F59E0B] text-white',
+      reviewed: 'bg-[#3B82F6] text-white',
+      resolved: 'bg-[#22C55E] text-white',
+      dismissed: 'bg-[#999999] text-white',
+    };
+    return (
+      <span className={`px-2 py-1 rounded text-xs font-medium ${colors[status] || 'bg-gray-200'}`}>
+        {status.charAt(0).toUpperCase() + status.slice(1)}
+      </span>
+    );
+  };
+
+  const getReasonLabel = (reason: string) => {
+    const labels: Record<string, string> = {
+      inappropriate_content: 'Inappropriate Content',
+      suspected_fraud: 'Suspected Fraud',
+      incorrect_information: 'Incorrect Information',
+      already_sold: 'Already Sold',
+      other: 'Other',
+    };
+    return labels[reason] || reason;
+  };
+
+  const handleSort = (column: string) => {
+    setFilters((prev) => ({
+      ...prev,
+      sortBy: column,
+      sortDirection: prev.sortBy === column && prev.sortDirection === 'desc' ? 'asc' : 'desc',
+    }));
+  };
+
+  const handlePageChange = (page: number) => {
+    setFilters((prev) => ({ ...prev, page }));
+  };
+
+  const columns = [
+    {
+      key: 'id' as const,
+      label: 'Report ID',
+      sortable: false,
+      render: (report: AdminReport) => (
+        <span className="font-mono text-xs">{report.id.slice(0, 8)}</span>
+      ),
+    },
+    {
+      key: 'reportReason' as const,
+      label: 'Type',
+      sortable: false,
+      render: (report: AdminReport) => getReasonLabel(report.reportReason),
+    },
+    {
+      key: 'reporterEmail' as const,
+      label: 'Reporter Email',
+      sortable: false,
+    },
+    {
+      key: 'reportedContentPreview' as const,
+      label: 'Reported Content',
+      sortable: false,
+      render: (report: AdminReport) => (
+        <span className="truncate max-w-xs" title={report.reportedContentPreview}>
+          {report.reportedContentPreview}
+        </span>
+      ),
+    },
+    {
+      key: 'reportedContentType' as const,
+      label: 'Content Type',
+      sortable: false,
+      render: (report: AdminReport) => (
+        <span className="capitalize">{report.reportedContentType}</span>
+      ),
+    },
+    {
+      key: 'status' as const,
+      label: 'Status',
+      sortable: false,
+      render: (report: AdminReport) => getStatusBadge(report.status),
+    },
+    {
+      key: 'createdAt' as const,
+      label: 'Created',
+      sortable: true,
+      render: (report: AdminReport) => formatDate(report.createdAt),
+    },
+  ];
+
+  return (
+    <div>
+      <div className="flex justify-between items-center mb-6">
+        <h2 className="text-lg font-semibold text-[#1A1A1A]">Moderation</h2>
+        <button
+          onClick={loadReports}
+          disabled={isLoading}
+          className="text-sm text-[#00843D] hover:text-[#006930] disabled:text-[#CCCCCC]"
+        >
+          {isLoading ? 'Refreshing...' : 'Refresh'}
+        </button>
+      </div>
+
+      {/* Error Message */}
+      {error && (
+        <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
+          {error}
+        </div>
+      )}
+
+      {/* Summary KPI Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        <KPICard
+          label="Total Reports"
+          value={data?.summary.total ?? 0}
+          subtitle={data ? `Offensive: ${data.summary.typeBreakdown.inappropriate_content}, Fraud: ${data.summary.typeBreakdown.suspected_fraud}` : undefined}
+          isLoading={isLoading}
+          error={error ? 'Error' : undefined}
+        />
+
+        <KPICard
+          label="Pending Reports"
+          value={data?.summary.pending ?? 0}
+          subtitle={
+            data?.summary.pending && data.summary.pending > 0
+              ? '⚠️ Needs attention'
+              : 'All clear'
+          }
+          isLoading={isLoading}
+          error={error ? 'Error' : undefined}
+        />
+
+        <KPICard
+          label="Resolved Reports"
+          value={data ? `${data.summary.resolutionRate.toFixed(1)}%` : '0%'}
+          subtitle={data ? `${data.summary.resolved + data.summary.dismissed} of ${data.summary.total}` : undefined}
+          isLoading={isLoading}
+          error={error ? 'Error' : undefined}
+        />
+
+        <KPICard
+          label="Avg Resolution Time"
+          value={data ? `${data.summary.avgResolutionTimeHours.toFixed(1)}h` : '0h'}
+          subtitle="Average time to resolve"
+          isLoading={isLoading}
+          error={error ? 'Error' : undefined}
+        />
+      </div>
+
+      {/* Reports Table */}
+      <DataTable
+        data={data?.reports ?? []}
+        isLoading={isLoading}
+        columns={columns}
+        sortBy={filters.sortBy}
+        sortDirection={filters.sortDirection}
+        onSort={handleSort}
+        pagination={data?.pagination}
+        onPageChange={handlePageChange}
       />
     </div>
   );
