@@ -27,13 +27,20 @@ export function EmailNotificationModal({
   const messageCharsRemaining = 2000 - message.length;
   const isValid = subject.trim().length > 0 && message.trim().length > 0 && subject.length <= 200 && message.length <= 2000;
 
+  // Reset form and call onCancel
+  const handleCancel = () => {
+    setSubject('');
+    setMessage('');
+    onCancel();
+  };
+
   // Focus trap and escape key handler
   useEffect(() => {
     if (!isOpen) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        onCancel();
+        handleCancel();
       }
 
       // Tab key focus trap
@@ -62,15 +69,7 @@ export function EmailNotificationModal({
     return () => {
       document.removeEventListener('keydown', handleKeyDown);
     };
-  }, [isOpen, onCancel]);
-
-  // Reset form when modal closes
-  useEffect(() => {
-    if (!isOpen) {
-      setSubject('');
-      setMessage('');
-    }
-  }, [isOpen]);
+  }, [isOpen, handleCancel]);
 
   if (!isOpen) return null;
 
@@ -89,7 +88,7 @@ export function EmailNotificationModal({
       {/* Backdrop */}
       <div
         className="absolute inset-0 bg-black/50"
-        onClick={isLoading ? undefined : onCancel}
+        onClick={isLoading ? undefined : handleCancel}
         aria-hidden="true"
       />
 
@@ -169,7 +168,7 @@ export function EmailNotificationModal({
 
         <div className="flex justify-end gap-3">
           <button
-            onClick={onCancel}
+            onClick={handleCancel}
             disabled={isLoading}
             className="px-4 py-2 text-sm font-medium text-[#666666] bg-white border border-[#EBEBEB] rounded-lg hover:border-[#1A1A1A] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
