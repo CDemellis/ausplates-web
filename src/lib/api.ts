@@ -2558,7 +2558,7 @@ export async function getAdminReports(token: string, filters: ReportsFilters): P
   params.append('sort_by', filters.sortBy);
   params.append('sort_direction', filters.sortDirection);
 
-  const res = await fetch(`${API_BASE_URL}/admin/analytics/reports?${params}`, {
+  const res = await fetch(`${API_BASE_URL}/api/admin/analytics/reports?${params}`, {
     headers: {
       Authorization: `Bearer ${token}`,
     },
@@ -2573,7 +2573,7 @@ export async function getAdminReports(token: string, filters: ReportsFilters): P
 }
 
 export async function getReportDetail(token: string, reportId: string): Promise<ReportDetail> {
-  const res = await fetch(`${API_BASE_URL}/admin/analytics/reports/${reportId}`, {
+  const res = await fetch(`${API_BASE_URL}/api/admin/analytics/reports/${reportId}`, {
     headers: {
       Authorization: `Bearer ${token}`,
     },
@@ -2594,7 +2594,7 @@ export async function bulkUpdateReportStatus(
   resolutionNote?: string,
   dismissedReason?: string
 ): Promise<{ success: boolean; updatedCount: number }> {
-  const res = await fetch(`${API_BASE_URL}/admin/analytics/reports/bulk`, {
+  const res = await fetch(`${API_BASE_URL}/api/admin/analytics/reports/bulk`, {
     method: 'PATCH',
     headers: {
       'Content-Type': 'application/json',
@@ -2620,7 +2620,7 @@ export async function bulkDeleteReports(
   token: string,
   reportIds: string[]
 ): Promise<{ success: boolean; deletedCount: number }> {
-  const res = await fetch(`${API_BASE_URL}/admin/analytics/reports/bulk`, {
+  const res = await fetch(`${API_BASE_URL}/api/admin/analytics/reports/bulk`, {
     method: 'DELETE',
     headers: {
       'Content-Type': 'application/json',
