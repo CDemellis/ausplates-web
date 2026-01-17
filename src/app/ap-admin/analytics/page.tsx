@@ -1023,12 +1023,11 @@ function UsersTab() {
       <BulkActionBar
         selectedCount={selectedRows.size}
         onChangeStatus={() => {
-          // Check if any selected users are banned
+          // Check if any selected users are not banned
           const selectedUsers = data?.users.filter((u) => selectedRows.has(u.id)) || [];
-          const hasBannedUsers = selectedUsers.some((u) => u.status === 'banned');
           const hasActiveBannedUsers = selectedUsers.some((u) => u.status !== 'banned');
 
-          // If mixed or all active, show ban modal
+          // If any users are not banned, show ban modal; otherwise show unban modal
           if (hasActiveBannedUsers) {
             setIsBanModalOpen(true);
           } else {
