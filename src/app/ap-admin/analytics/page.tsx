@@ -614,6 +614,7 @@ function ListingsTab() {
         onExportCSV={handleExportCSV}
         onDelete={() => setIsDeleteModalOpen(true)}
         onClearSelection={handleClearSelection}
+        itemLabel="listing"
       />
 
       {/* Delete Confirmation Modal */}
@@ -1037,6 +1038,7 @@ function UsersTab() {
         onExportCSV={handleExportCSV}
         onDelete={() => setIsDeleteModalOpen(true)}
         onClearSelection={handleClearSelection}
+        itemLabel="user"
         customActions={[
           {
             label: 'Send Email',
@@ -1507,6 +1509,7 @@ function ModerationTab() {
         onExportCSV={handleExportCSV}
         onDelete={() => setIsDeleteModalOpen(true)}
         onClearSelection={handleClearSelection}
+        itemLabel="report"
         customActions={[
           {
             label: 'Dismiss',
@@ -1729,7 +1732,7 @@ function PerformanceTab() {
                 <YAxis stroke="#666666" fontSize={12} />
                 <Tooltip
                   contentStyle={{ backgroundColor: '#FFF', border: '1px solid #EBEBEB', borderRadius: '8px' }}
-                  formatter={(value: number) => `${value}ms`}
+                  formatter={(value: number | undefined) => value !== undefined ? `${value}ms` : 'N/A'}
                   labelFormatter={formatDate}
                 />
                 <Legend />
@@ -1750,7 +1753,7 @@ function PerformanceTab() {
                 <YAxis stroke="#666666" fontSize={12} />
                 <Tooltip
                   contentStyle={{ backgroundColor: '#FFF', border: '1px solid #EBEBEB', borderRadius: '8px' }}
-                  formatter={(value: number) => `${value.toFixed(2)}%`}
+                  formatter={(value: number | undefined) => value !== undefined ? `${value.toFixed(2)}%` : 'N/A'}
                   labelFormatter={formatDate}
                 />
                 <Legend />
