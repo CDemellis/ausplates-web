@@ -2127,3 +2127,53 @@ export async function exportUserData(accessToken: string): Promise<UserDataExpor
 
   return res.json();
 }
+
+// ============================================================================
+// ADMIN ANALYTICS
+// ============================================================================
+
+export interface OverviewMetrics {
+  users: {
+    total: number;
+    growth7d: number;
+    growthPercentage: number;
+  };
+  listings: {
+    total: number;
+    active: number;
+    sold: number;
+  };
+  conversion: {
+    totalViews: number;
+    totalSales: number;
+    conversionRate: number;
+  };
+  health: {
+    score: number;
+    breakdown: {
+      activeListings: number;
+      emailVerification: number;
+      recentActivity: number;
+      reportResolution: number;
+    };
+  };
+}
+
+export async function getOverviewMetrics(accessToken: string): Promise<OverviewMetrics> {
+  const url = `${API_BASE_URL}/api/admin/analytics/overview`;
+
+  const res = await fetchWithRetry(url, {
+    headers: {
+      'Authorization': `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+  });
+
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.error || 'Failed to fetch overview metrics');
+  }
+
+  const data = await res.json();
+  return data;
+}
