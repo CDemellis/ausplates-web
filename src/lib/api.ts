@@ -2636,3 +2636,177 @@ export async function bulkDeleteReports(
 
   return res.json();
 }
+
+// ============================================================================
+// PERFORMANCE MONITORING
+// ============================================================================
+
+export interface PerformanceSummary {
+  timeRange: string;
+  avgResponseTime: number;
+  avgResponseTimeTrend: number;
+  errorRate: number;
+  errorRateTrend: number;
+  totalRequests: number;
+  requestsTrend: number;
+  p95ResponseTime: number;
+  cacheHitRate: number;
+}
+
+export interface TimeseriesDataPoint {
+  timestamp: string;
+  avgDuration: number;
+  p50Duration: number;
+  p95Duration: number;
+  p99Duration: number;
+  requestCount: number;
+  errorCount: number;
+  errorRate: number;
+}
+
+export interface PerformanceTimeseries {
+  timeRange: string;
+  endpoint: string;
+  data: TimeseriesDataPoint[];
+}
+
+export interface EndpointPerformance {
+  endpoint: string;
+  method: string;
+  requestCount: number;
+  avgDuration: number;
+  p95Duration: number;
+  p99Duration: number;
+  errorCount: number;
+  errorRate: number;
+}
+
+export interface PerformanceEndpoints {
+  timeRange: string;
+  endpoints: EndpointPerformance[];
+}
+
+export interface ErrorLog {
+  id: string;
+  errorId: string;
+  endpoint: string;
+  method: string;
+  statusCode: number;
+  errorType: string;
+  errorMessage: string;
+  errorStack: string | null;
+  occurrenceCount: number;
+  firstSeen: string;
+  lastSeen: string;
+  userId: string | null;
+  userAgent: string | null;
+}
+
+export interface PerformanceErrors {
+  errors: ErrorLog[];
+  total: number;
+}
+
+export async function getPerformanceSummary(
+  accessToken: string,
+  timeRange: string = '24h'
+): Promise<PerformanceSummary> {
+  const params = new URLSearchParams();
+  params.set('time_range', timeRange);
+
+  const url = `${API_BASE_URL}/api/admin/analytics/performance/summary?${params.toString()}`;
+
+  const res = await fetchWithRetry(url, {
+    headers: {
+      'Authorization': `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+  });
+
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.error || 'Failed to fetch performance summary');
+  }
+
+  return res.json();
+}
+
+export async function getPerformanceTimeseries(
+  accessToken: string,
+  timeRange: string = '24h',
+  endpoint?: string
+): Promise<PerformanceTimeseries> {
+  const params = new URLSearchParams();
+  params.set('time_range', timeRange);
+  if (endpoint) params.set('endpoint', endpoint);
+
+  const url = `${API_BASE_URL}/api/admin/analytics/performance/timeseries?${params.toString()}`;
+
+  const res = await fetchWithRetry(url, {
+    headers: {
+      'Authorization': `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+  });
+
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.error || 'Failed to fetch performance timeseries');
+  }
+
+  return res.json();
+}
+
+export async function getPerformanceEndpoints(
+  accessToken: string,
+  timeRange: string = '24h',
+  limit: number = 10
+): Promise<PerformanceEndpoints> {
+  const params = new URLSearchParams();
+  params.set('time_range', timeRange);
+  params.set('limit', limit.toString());
+
+  const url = `${API_BASE_URL}/api/admin/analytics/performance/endpoints?${params.toString()}`;
+
+  const res = await fetchWithRetry(url, {
+    headers: {
+      'Authorization': `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+  });
+
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.error || 'Failed to fetch performance endpoints');
+  }
+
+  return res.json();
+}
+
+export async function getPerformanceErrors(
+  accessToken: string,
+  limit: number = 100,
+  endpoint?: string,
+  statusCode?: number
+): Promise<PerformanceErrors> {
+  const params = new URLSearchParams();
+  params.set('limit', limit.toString());
+  if (endpoint) params.set('endpoint', endpoint);
+  if (statusCode) params.set('status_code', statusCode.toString());
+
+  const url = `${API_BASE_URL}/api/admin/analytics/performance/errors?${params.toString()}`;
+
+  const res = await fetchWithRetry(url, {
+    headers: {
+      'Authorization': `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+  });
+
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.error || 'Failed to fetch performance errors');
+  }
+
+  return res.json();
+}

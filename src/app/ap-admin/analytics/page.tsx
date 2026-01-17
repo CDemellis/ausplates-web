@@ -26,6 +26,14 @@ import {
   getReportDetail,
   bulkUpdateReportStatus,
   bulkDeleteReports,
+  getPerformanceSummary,
+  getPerformanceTimeseries,
+  getPerformanceEndpoints,
+  getPerformanceErrors,
+  PerformanceSummary,
+  PerformanceTimeseries,
+  PerformanceEndpoints,
+  PerformanceErrors,
 } from '@/lib/api';
 import { KPICard } from '@/components/admin/KPICard';
 import { FilterPanel } from '@/components/admin/FilterPanel';
@@ -38,6 +46,7 @@ import { EmailNotificationModal } from '@/components/admin/EmailNotificationModa
 import { ReportDetailsModal } from '@/components/admin/ReportDetailsModal';
 import { ResolutionNoteModal } from '@/components/admin/ResolutionNoteModal';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
+import { LineChart, Line, AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 type TabKey = 'overview' | 'users' | 'listings' | 'performance' | 'moderation' | 'system';
 
@@ -45,7 +54,7 @@ const TABS = [
   { key: 'overview' as TabKey, label: 'Overview', enabled: true },
   { key: 'users' as TabKey, label: 'Users', enabled: true },
   { key: 'listings' as TabKey, label: 'Listings', enabled: true },
-  { key: 'performance' as TabKey, label: 'Performance', enabled: false },
+  { key: 'performance' as TabKey, label: 'Performance', enabled: true },
   { key: 'moderation' as TabKey, label: 'Moderation', enabled: true },
   { key: 'system' as TabKey, label: 'System Health', enabled: false },
 ];
@@ -100,7 +109,7 @@ export default function AnalyticsPage() {
         {activeTab === 'overview' && <OverviewTab />}
         {activeTab === 'users' && <UsersTab />}
         {activeTab === 'listings' && <ListingsTab />}
-        {activeTab === 'performance' && <PlaceholderTab name="Performance" />}
+        {activeTab === 'performance' && <PerformanceTab />}
         {activeTab === 'moderation' && <ModerationTab />}
         {activeTab === 'system' && <PlaceholderTab name="System Health" />}
       </div>
@@ -1540,6 +1549,315 @@ function ModerationTab() {
         onCancel={() => setIsDeleteModalOpen(false)}
         isLoading={isPerformingAction}
       />
+    </div>
+  );
+}
+
+function PerformanceTab() {
+  const { getAccessToken } = useAuth();
+  const [summary, setSummary] = useState<PerformanceSummary | null>(null);
+  const [timeseries, setTimeseries] = useState<PerformanceTimeseries | null>(null);
+  const [endpoints, setEndpoints] = useState<PerformanceEndpoints | null>(null);
+  const [errors, setErrors] = useState<PerformanceErrors | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string>('');
+  const [timeRange, setTimeRange] = useState<string>('24h');
+  const hasLoaded = useRef(false);
+  const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  const loadPerformanceData = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      setError('');
+      const token = await getAccessToken();
+      if (!token) {
+        setError('Not authenticated');
+        return;
+      }
+
+      // Load all performance data in parallel
+      const [summaryData, timeseriesData, endpointsData, errorsData] = await Promise.all([
+        getPerformanceSummary(token, timeRange),
+        getPerformanceTimeseries(token, timeRange),
+        getPerformanceEndpoints(token, timeRange, 10),
+        getPerformanceErrors(token, 100),
+      ]);
+
+      setSummary(summaryData);
+      setTimeseries(timeseriesData);
+      setEndpoints(endpointsData);
+      setErrors(errorsData);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load performance data');
+      console.error('Failed to load performance data:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [getAccessToken, timeRange]);
+
+  useEffect(() => {
+    if (hasLoaded.current) return;
+    hasLoaded.current = true;
+    loadPerformanceData();
+
+    // Poll every 30 seconds for real-time updates
+    pollIntervalRef.current = setInterval(loadPerformanceData, 30000);
+
+    return () => {
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current);
+      }
+    };
+  }, [loadPerformanceData]);
+
+  // Reload when time range changes
+  useEffect(() => {
+    if (!hasLoaded.current) return;
+    loadPerformanceData();
+  }, [timeRange, loadPerformanceData]);
+
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    if (timeRange === '1h' || timeRange === '6h') {
+      return date.toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit' });
+    }
+    return date.toLocaleDateString('en-AU', { day: '2-digit', month: 'short' });
+  };
+
+  const formatDuration = (ms: number) => {
+    if (ms < 1000) return `${ms}ms`;
+    return `${(ms / 1000).toFixed(2)}s`;
+  };
+
+  const getTrendIndicator = (value: number) => {
+    if (value === 0) return null;
+    const isPositive = value > 0;
+    return (
+      <span className={`text-xs ml-2 ${isPositive ? 'text-[#EF4444]' : 'text-[#22C55E]'}`}>
+        {isPositive ? '↑' : '↓'} {Math.abs(value).toFixed(1)}%
+      </span>
+    );
+  };
+
+  return (
+    <div>
+      <div className="flex justify-between items-center mb-6">
+        <h2 className="text-lg font-semibold text-[#1A1A1A]">Performance Monitoring</h2>
+        <div className="flex gap-4 items-center">
+          <select
+            value={timeRange}
+            onChange={(e) => setTimeRange(e.target.value)}
+            className="px-3 py-2 border border-[#EBEBEB] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#00843D]"
+          >
+            <option value="1h">Last 1 hour</option>
+            <option value="6h">Last 6 hours</option>
+            <option value="24h">Last 24 hours</option>
+            <option value="7d">Last 7 days</option>
+            <option value="30d">Last 30 days</option>
+          </select>
+          <button
+            onClick={loadPerformanceData}
+            disabled={isLoading}
+            className="text-sm text-[#00843D] hover:text-[#006930] disabled:text-[#CCCCCC]"
+          >
+            {isLoading ? 'Refreshing...' : 'Refresh'}
+          </button>
+        </div>
+      </div>
+
+      {/* Error Message */}
+      {error && (
+        <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
+          {error}
+        </div>
+      )}
+
+      {/* KPI Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        <KPICard
+          label="Avg Response Time"
+          value={summary ? `${summary.avgResponseTime}ms` : '0ms'}
+          subtitle={summary ? getTrendIndicator(summary.avgResponseTimeTrend) : undefined}
+          isLoading={isLoading}
+          error={error ? 'Error' : undefined}
+        />
+        <KPICard
+          label="Error Rate"
+          value={summary ? `${summary.errorRate.toFixed(2)}%` : '0%'}
+          subtitle={summary ? getTrendIndicator(summary.errorRateTrend) : undefined}
+          isLoading={isLoading}
+          error={error ? 'Error' : undefined}
+        />
+        <KPICard
+          label="Total Requests"
+          value={summary ? summary.totalRequests.toLocaleString() : '0'}
+          subtitle={summary ? getTrendIndicator(summary.requestsTrend) : undefined}
+          isLoading={isLoading}
+          error={error ? 'Error' : undefined}
+        />
+        <KPICard
+          label="P95 Response Time"
+          value={summary ? `${summary.p95ResponseTime}ms` : '0ms'}
+          subtitle="95th percentile"
+          isLoading={isLoading}
+          error={error ? 'Error' : undefined}
+        />
+      </div>
+
+      {/* Charts */}
+      {!isLoading && timeseries && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+          {/* Response Time Chart */}
+          <div className="bg-white border border-[#EBEBEB] rounded-lg p-6">
+            <h3 className="text-sm font-semibold text-[#1A1A1A] mb-4">Response Time (P50/P95/P99)</h3>
+            <ResponsiveContainer width="100%" height={300}>
+              <LineChart data={timeseries.data}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#EBEBEB" />
+                <XAxis dataKey="timestamp" tickFormatter={formatDate} stroke="#666666" fontSize={12} />
+                <YAxis stroke="#666666" fontSize={12} />
+                <Tooltip
+                  contentStyle={{ backgroundColor: '#FFF', border: '1px solid #EBEBEB', borderRadius: '8px' }}
+                  formatter={(value: number) => `${value}ms`}
+                  labelFormatter={formatDate}
+                />
+                <Legend />
+                <Line type="monotone" dataKey="p50Duration" stroke="#00843D" name="P50" strokeWidth={2} dot={false} />
+                <Line type="monotone" dataKey="p95Duration" stroke="#FFCD00" name="P95" strokeWidth={2} dot={false} />
+                <Line type="monotone" dataKey="p99Duration" stroke="#EF4444" name="P99" strokeWidth={2} dot={false} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+
+          {/* Error Rate Chart */}
+          <div className="bg-white border border-[#EBEBEB] rounded-lg p-6">
+            <h3 className="text-sm font-semibold text-[#1A1A1A] mb-4">Error Rate</h3>
+            <ResponsiveContainer width="100%" height={300}>
+              <AreaChart data={timeseries.data}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#EBEBEB" />
+                <XAxis dataKey="timestamp" tickFormatter={formatDate} stroke="#666666" fontSize={12} />
+                <YAxis stroke="#666666" fontSize={12} />
+                <Tooltip
+                  contentStyle={{ backgroundColor: '#FFF', border: '1px solid #EBEBEB', borderRadius: '8px' }}
+                  formatter={(value: number) => `${value.toFixed(2)}%`}
+                  labelFormatter={formatDate}
+                />
+                <Legend />
+                <Area type="monotone" dataKey="errorRate" stroke="#EF4444" fill="#FEE2E2" name="Error Rate %" />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      )}
+
+      {/* Request Volume Chart */}
+      {!isLoading && timeseries && (
+        <div className="bg-white border border-[#EBEBEB] rounded-lg p-6 mb-8">
+          <h3 className="text-sm font-semibold text-[#1A1A1A] mb-4">Request Volume</h3>
+          <ResponsiveContainer width="100%" height={250}>
+            <BarChart data={timeseries.data}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#EBEBEB" />
+              <XAxis dataKey="timestamp" tickFormatter={formatDate} stroke="#666666" fontSize={12} />
+              <YAxis stroke="#666666" fontSize={12} />
+              <Tooltip
+                contentStyle={{ backgroundColor: '#FFF', border: '1px solid #EBEBEB', borderRadius: '8px' }}
+                labelFormatter={formatDate}
+              />
+              <Legend />
+              <Bar dataKey="requestCount" fill="#00843D" name="Requests" />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      )}
+
+      {/* Slowest Endpoints Table */}
+      {!isLoading && endpoints && (
+        <div className="bg-white border border-[#EBEBEB] rounded-lg p-6 mb-8">
+          <h3 className="text-sm font-semibold text-[#1A1A1A] mb-4">Slowest Endpoints (Top 10)</h3>
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-[#EBEBEB]">
+              <thead>
+                <tr>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-[#666666] uppercase tracking-wider">Endpoint</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-[#666666] uppercase tracking-wider">Method</th>
+                  <th className="px-4 py-3 text-right text-xs font-medium text-[#666666] uppercase tracking-wider">Requests</th>
+                  <th className="px-4 py-3 text-right text-xs font-medium text-[#666666] uppercase tracking-wider">Avg</th>
+                  <th className="px-4 py-3 text-right text-xs font-medium text-[#666666] uppercase tracking-wider">P95</th>
+                  <th className="px-4 py-3 text-right text-xs font-medium text-[#666666] uppercase tracking-wider">P99</th>
+                  <th className="px-4 py-3 text-right text-xs font-medium text-[#666666] uppercase tracking-wider">Errors</th>
+                  <th className="px-4 py-3 text-right text-xs font-medium text-[#666666] uppercase tracking-wider">Error %</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[#EBEBEB]">
+                {endpoints.endpoints.length === 0 ? (
+                  <tr>
+                    <td colSpan={8} className="px-4 py-8 text-center text-[#999999]">
+                      No endpoint data available
+                    </td>
+                  </tr>
+                ) : (
+                  endpoints.endpoints.map((ep, idx) => (
+                    <tr key={idx} className="hover:bg-[#F8F8F8]">
+                      <td className="px-4 py-3 text-sm font-mono text-[#1A1A1A]">{ep.endpoint}</td>
+                      <td className="px-4 py-3 text-sm text-[#666666]">{ep.method}</td>
+                      <td className="px-4 py-3 text-sm text-right text-[#666666]">{ep.requestCount.toLocaleString()}</td>
+                      <td className="px-4 py-3 text-sm text-right text-[#666666]">{formatDuration(ep.avgDuration)}</td>
+                      <td className="px-4 py-3 text-sm text-right text-[#666666]">{formatDuration(ep.p95Duration)}</td>
+                      <td className="px-4 py-3 text-sm text-right text-[#666666]">{formatDuration(ep.p99Duration)}</td>
+                      <td className="px-4 py-3 text-sm text-right text-[#EF4444]">{ep.errorCount}</td>
+                      <td className="px-4 py-3 text-sm text-right text-[#EF4444]">{ep.errorRate.toFixed(2)}%</td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Recent Errors Table */}
+      {!isLoading && errors && (
+        <div className="bg-white border border-[#EBEBEB] rounded-lg p-6">
+          <h3 className="text-sm font-semibold text-[#1A1A1A] mb-4">Recent Errors (Last 100)</h3>
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-[#EBEBEB]">
+              <thead>
+                <tr>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-[#666666] uppercase tracking-wider">Last Seen</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-[#666666] uppercase tracking-wider">Endpoint</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-[#666666] uppercase tracking-wider">Method</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-[#666666] uppercase tracking-wider">Status</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-[#666666] uppercase tracking-wider">Error</th>
+                  <th className="px-4 py-3 text-right text-xs font-medium text-[#666666] uppercase tracking-wider">Occurrences</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[#EBEBEB]">
+                {errors.errors.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="px-4 py-8 text-center text-[#999999]">
+                      No errors logged
+                    </td>
+                  </tr>
+                ) : (
+                  errors.errors.map((err) => (
+                    <tr key={err.id} className="hover:bg-[#F8F8F8]">
+                      <td className="px-4 py-3 text-sm text-[#666666]">
+                        {new Date(err.lastSeen).toLocaleString('en-AU', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                      </td>
+                      <td className="px-4 py-3 text-sm font-mono text-[#1A1A1A]">{err.endpoint}</td>
+                      <td className="px-4 py-3 text-sm text-[#666666]">{err.method}</td>
+                      <td className="px-4 py-3 text-sm text-[#EF4444]">{err.statusCode}</td>
+                      <td className="px-4 py-3 text-sm text-[#1A1A1A] max-w-md truncate" title={err.errorMessage}>
+                        {err.errorMessage}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-right text-[#666666]">{err.occurrenceCount}</td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
