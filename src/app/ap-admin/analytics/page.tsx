@@ -11,6 +11,7 @@ import {
 } from '@/lib/api';
 import { KPICard } from '@/components/admin/KPICard';
 import { FilterPanel } from '@/components/admin/FilterPanel';
+import { DataTable } from '@/components/admin/DataTable';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 
 type TabKey = 'overview' | 'users' | 'listings' | 'performance' | 'moderation' | 'system';
@@ -304,6 +305,90 @@ function ListingsTab() {
     return `$${(cents / 100).toLocaleString('en-AU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   };
 
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-AU', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+    });
+  };
+
+  const getStatusBadge = (status: string) => {
+    const colors: Record<string, string> = {
+      active: 'bg-[#22C55E] text-white',
+      draft: 'bg-[#999999] text-white',
+      sold: 'bg-[#00843D] text-white',
+      expired: 'bg-[#F59E0B] text-white',
+      removed: 'bg-[#EF4444] text-white',
+    };
+    return (
+      <span className={`px-2 py-1 rounded text-xs font-medium ${colors[status] || 'bg-gray-200'}`}>
+        {status.charAt(0).toUpperCase() + status.slice(1)}
+      </span>
+    );
+  };
+
+  const handleSort = (column: string) => {
+    setFilters((prev) => ({
+      ...prev,
+      sortBy: column as any,
+      sortDirection: prev.sortBy === column && prev.sortDirection === 'desc' ? 'asc' : 'desc',
+    }));
+  };
+
+  const handlePageChange = (page: number) => {
+    setFilters((prev) => ({ ...prev, page }));
+  };
+
+  const columns = [
+    {
+      key: 'combination' as const,
+      label: 'Combination',
+      sortable: true,
+    },
+    {
+      key: 'state' as const,
+      label: 'State',
+      sortable: true,
+    },
+    {
+      key: 'plateType' as const,
+      label: 'Type',
+      sortable: true,
+      render: (listing: AdminListing) => (
+        <span className="capitalize">{listing.plateType.replace(/([A-Z])/g, ' $1').trim()}</span>
+      ),
+    },
+    {
+      key: 'price' as const,
+      label: 'Price',
+      sortable: true,
+      render: (listing: AdminListing) => formatCurrency(listing.price),
+    },
+    {
+      key: 'status' as const,
+      label: 'Status',
+      sortable: true,
+      render: (listing: AdminListing) => getStatusBadge(listing.status),
+    },
+    {
+      key: 'viewsCount' as const,
+      label: 'Views',
+      sortable: true,
+    },
+    {
+      key: 'ownerEmail' as const,
+      label: 'Owner Email',
+      sortable: false,
+    },
+    {
+      key: 'createdAt' as const,
+      label: 'Created',
+      sortable: true,
+      render: (listing: AdminListing) => formatDate(listing.createdAt),
+    },
+  ];
+
   return (
     <div>
       <div className="flex justify-between items-center mb-6">
@@ -369,18 +454,17 @@ function ListingsTab() {
         onFilterChange={setFilters}
       />
 
-      {/* Listings Table Placeholder */}
-      <div className="bg-white border border-[#EBEBEB] rounded-lg p-6">
-        <h3 className="text-sm font-semibold text-[#1A1A1A] mb-4">Listings Table</h3>
-        <div className="text-[#666666] text-sm">
-          <p>Table and bulk actions coming next...</p>
-          {data && (
-            <p className="mt-2">
-              Found {data.pagination.total} listings (page {data.pagination.page} of {data.pagination.totalPages})
-            </p>
-          )}
-        </div>
-      </div>
+      {/* Listings Table */}
+      <DataTable
+        data={data?.listings ?? []}
+        isLoading={isLoading}
+        columns={columns}
+        sortBy={filters.sortBy}
+        sortDirection={filters.sortDirection}
+        onSort={handleSort}
+        pagination={data?.pagination}
+        onPageChange={handlePageChange}
+      />
     </div>
   );
 }
