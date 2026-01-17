@@ -2306,3 +2306,91 @@ export async function bulkUpdateListingStatus(
 
   return res.json();
 }
+
+// ============================================
+// ADMIN USERS API
+// ============================================
+
+export interface AdminUser {
+  id: string;
+  email: string;
+  fullName: string | null;
+  createdAt: string;
+  listingsCount: number;
+  emailVerified: boolean;
+  lastSignInAt: string | null;
+  status: 'active' | 'inactive' | 'banned';
+  accountType: 'email' | 'apple';
+  totalRevenue: number;
+}
+
+export interface UsersSummary {
+  total: number;
+  total7dAgo: number;
+  total30dAgo: number;
+  growth7d: number;
+  growth30d: number;
+  activeUsers30d: number;
+  emailVerifiedCount: number;
+  emailVerifiedPercent: number;
+  totalRevenue: number;
+  revenuePerUser: number;
+}
+
+export interface UsersFilters {
+  status?: 'active' | 'inactive' | 'banned';
+  emailVerified?: boolean;
+  accountType?: 'email' | 'apple';
+  dateFrom?: string;
+  dateTo?: string;
+  search?: string;
+  page?: number;
+  limit?: number;
+  sortBy?: string;
+  sortDirection?: 'asc' | 'desc';
+}
+
+export interface UsersResponse {
+  users: AdminUser[];
+  summary: UsersSummary;
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+}
+
+export async function getAdminUsers(
+  accessToken: string,
+  filters?: UsersFilters
+): Promise<UsersResponse> {
+  const params = new URLSearchParams();
+  if (filters?.status) params.set('status', filters.status);
+  if (filters?.emailVerified !== undefined) params.set('email_verified', filters.emailVerified.toString());
+  if (filters?.accountType) params.set('account_type', filters.accountType);
+  if (filters?.dateFrom) params.set('date_from', filters.dateFrom);
+  if (filters?.dateTo) params.set('date_to', filters.dateTo);
+  if (filters?.search) params.set('search', filters.search);
+  if (filters?.page) params.set('page', filters.page.toString());
+  if (filters?.limit) params.set('limit', filters.limit.toString());
+  if (filters?.sortBy) params.set('sort_by', filters.sortBy);
+  if (filters?.sortDirection) params.set('sort_direction', filters.sortDirection);
+
+  const url = `${API_BASE_URL}/api/admin/analytics/users${params.toString() ? '?' + params.toString() : ''}`;
+
+  const res = await fetchWithRetry(url, {
+    headers: {
+      'Authorization': `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+  });
+
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.error || 'Failed to fetch users');
+  }
+
+  const data = await res.json();
+  return data;
+}

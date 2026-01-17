@@ -11,6 +11,10 @@ import {
   bulkDeleteListings,
   bulkUpdateListingStatus,
   AdminListing,
+  getAdminUsers,
+  UsersResponse,
+  UsersFilters,
+  AdminUser,
 } from '@/lib/api';
 import { KPICard } from '@/components/admin/KPICard';
 import { FilterPanel } from '@/components/admin/FilterPanel';
@@ -23,7 +27,7 @@ type TabKey = 'overview' | 'users' | 'listings' | 'performance' | 'moderation' |
 
 const TABS = [
   { key: 'overview' as TabKey, label: 'Overview', enabled: true },
-  { key: 'users' as TabKey, label: 'Users', enabled: false },
+  { key: 'users' as TabKey, label: 'Users', enabled: true },
   { key: 'listings' as TabKey, label: 'Listings', enabled: true },
   { key: 'performance' as TabKey, label: 'Performance', enabled: false },
   { key: 'moderation' as TabKey, label: 'Moderation', enabled: false },
@@ -78,7 +82,7 @@ export default function AnalyticsPage() {
       {/* Tab Content */}
       <div className="mt-6">
         {activeTab === 'overview' && <OverviewTab />}
-        {activeTab === 'users' && <PlaceholderTab name="Users" />}
+        {activeTab === 'users' && <UsersTab />}
         {activeTab === 'listings' && <ListingsTab />}
         {activeTab === 'performance' && <PlaceholderTab name="Performance" />}
         {activeTab === 'moderation' && <PlaceholderTab name="Moderation" />}
@@ -608,6 +612,134 @@ function ListingsTab() {
         onCancel={() => setIsStatusModalOpen(false)}
         isLoading={isPerformingAction}
       />
+    </div>
+  );
+}
+
+function UsersTab() {
+  const { getAccessToken } = useAuth();
+  const [data, setData] = useState<UsersResponse | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string>('');
+  const [filters, setFilters] = useState<UsersFilters>({
+    page: 1,
+    limit: 50,
+    sortBy: 'created_at',
+    sortDirection: 'desc',
+  });
+  const hasLoaded = useRef(false);
+
+  const loadUsers = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      setError('');
+      const token = await getAccessToken();
+      if (!token) {
+        setError('Not authenticated');
+        return;
+      }
+
+      const response = await getAdminUsers(token, filters);
+      setData(response);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load users');
+      console.error('Failed to load users:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [getAccessToken, filters]);
+
+  useEffect(() => {
+    if (hasLoaded.current) return;
+    hasLoaded.current = true;
+    loadUsers();
+  }, [loadUsers]);
+
+  // Reload when filters change
+  useEffect(() => {
+    if (!hasLoaded.current) return;
+    loadUsers();
+  }, [filters, loadUsers]);
+
+  const formatCurrency = (cents: number) => {
+    return `$${(cents / 100).toLocaleString('en-AU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  };
+
+  return (
+    <div>
+      <div className="flex justify-between items-center mb-6">
+        <h2 className="text-lg font-semibold text-[#1A1A1A]">Users Management</h2>
+        <button
+          onClick={loadUsers}
+          disabled={isLoading}
+          className="text-sm text-[#00843D] hover:text-[#006930] disabled:text-[#CCCCCC]"
+        >
+          {isLoading ? 'Refreshing...' : 'Refresh'}
+        </button>
+      </div>
+
+      {/* Error Message */}
+      {error && (
+        <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
+          {error}
+        </div>
+      )}
+
+      {/* Summary KPI Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        <KPICard
+          label="Total Users"
+          value={data?.summary.total ?? 0}
+          trend={
+            data
+              ? {
+                  value: Number(data.summary.growth7d.toFixed(1)),
+                  isPositive: data.summary.growth7d >= 0,
+                }
+              : undefined
+          }
+          subtitle={data ? `30d: ${data.summary.growth30d >= 0 ? '+' : ''}${data.summary.growth30d.toFixed(1)}%` : undefined}
+          isLoading={isLoading}
+          error={error ? 'Error' : undefined}
+        />
+
+        <KPICard
+          label="Active Users"
+          value={data?.summary.activeUsers30d ?? 0}
+          subtitle="Last 30 days"
+          isLoading={isLoading}
+          error={error ? 'Error' : undefined}
+        />
+
+        <KPICard
+          label="Email Verified"
+          value={data ? `${data.summary.emailVerifiedPercent.toFixed(1)}%` : '0%'}
+          subtitle={data ? `${data.summary.emailVerifiedCount.toLocaleString()} users` : undefined}
+          isLoading={isLoading}
+          error={error ? 'Error' : undefined}
+        />
+
+        <KPICard
+          label="Revenue per User"
+          value={data ? formatCurrency(data.summary.revenuePerUser) : '$0.00'}
+          subtitle={data ? `Total: ${formatCurrency(data.summary.totalRevenue)}` : undefined}
+          isLoading={isLoading}
+          error={error ? 'Error' : undefined}
+        />
+      </div>
+
+      {/* Placeholder for filters and table */}
+      <div className="bg-white border border-[#EBEBEB] rounded-lg p-6">
+        <h3 className="text-sm font-semibold text-[#1A1A1A] mb-4">Users Table</h3>
+        <div className="text-[#666666] text-sm">
+          <p>Filters and table coming next...</p>
+          {data && (
+            <p className="mt-2">
+              Found {data.pagination.total} users (page {data.pagination.page} of {data.pagination.totalPages})
+            </p>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
