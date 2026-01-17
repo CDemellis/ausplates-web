@@ -65,7 +65,7 @@ export default function TwoFactorSettingsPage() {
 
       // Redirect to setup after a moment
       setTimeout(() => {
-        router.push('/2fa/setup');
+        router.push('/ap-admin/2fa/setup');
       }, 2000);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to disable 2FA');
@@ -162,7 +162,7 @@ export default function TwoFactorSettingsPage() {
               Two-factor authentication is required for admin access. Please set it up to continue.
             </p>
             <button
-              onClick={() => router.push('/2fa/setup')}
+              onClick={() => router.push('/ap-admin/2fa/setup')}
               className="px-4 py-2 bg-[#00843D] text-white font-medium rounded-lg hover:bg-[#006B32] transition-colors"
             >
               Set Up 2FA

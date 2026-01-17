@@ -62,8 +62,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
         // Check if 2FA is enabled
         if (!status.totpEnabled) {
-          if (!pathname.startsWith('/2fa/setup')) {
-            router.push('/2fa/setup');
+          if (!pathname.startsWith('/2fa/setup') && !pathname.startsWith('/ap-admin/2fa/setup')) {
+            router.push('/ap-admin/2fa/setup');
             return;
           }
         } else {
@@ -73,9 +73,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             (Date.now() - parseInt(twoFaVerifiedAt, 10)) < TWO_FA_SESSION_DURATION_MS;
 
           if (!isSessionValid) {
-            if (!pathname.startsWith('/2fa/verify')) {
+            if (!pathname.startsWith('/2fa/verify') && !pathname.startsWith('/ap-admin/2fa/verify')) {
               sessionStorage.setItem('admin_redirect_after_2fa', pathname);
-              router.push('/2fa/verify');
+              router.push('/ap-admin/2fa/verify');
               return;
             }
           }
@@ -129,7 +129,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   }
 
   // Allow 2FA setup/verify pages without full admin layout
-  if (pathname.startsWith('/2fa/setup') || pathname.startsWith('/2fa/verify')) {
+  if (pathname.startsWith('/2fa/setup') || pathname.startsWith('/ap-admin/2fa/setup') ||
+      pathname.startsWith('/2fa/verify') || pathname.startsWith('/ap-admin/2fa/verify')) {
     return <>{children}</>;
   }
 
