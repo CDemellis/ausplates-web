@@ -18,6 +18,7 @@ import {
 } from '@/lib/api';
 import { KPICard } from '@/components/admin/KPICard';
 import { FilterPanel } from '@/components/admin/FilterPanel';
+import { UsersFilterPanel } from '@/components/admin/UsersFilterPanel';
 import { DataTable } from '@/components/admin/DataTable';
 import { BulkActionBar } from '@/components/admin/BulkActionBar';
 import { ConfirmModal } from '@/components/admin/ConfirmModal';
@@ -665,6 +666,95 @@ function UsersTab() {
     return `$${(cents / 100).toLocaleString('en-AU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   };
 
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-AU', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+    });
+  };
+
+  const getStatusBadge = (status: string) => {
+    const colors: Record<string, string> = {
+      active: 'bg-[#22C55E] text-white',
+      inactive: 'bg-[#999999] text-white',
+      banned: 'bg-[#EF4444] text-white',
+    };
+    return (
+      <span className={`px-2 py-1 rounded text-xs font-medium ${colors[status] || 'bg-gray-200'}`}>
+        {status.charAt(0).toUpperCase() + status.slice(1)}
+      </span>
+    );
+  };
+
+  const getVerifiedBadge = (verified: boolean) => {
+    return verified ? (
+      <span className="inline-flex items-center gap-1 text-[#22C55E]">
+        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+        </svg>
+        Yes
+      </span>
+    ) : (
+      <span className="text-[#999999]">No</span>
+    );
+  };
+
+  const handleSort = (column: string) => {
+    setFilters((prev) => ({
+      ...prev,
+      sortBy: column,
+      sortDirection: prev.sortBy === column && prev.sortDirection === 'desc' ? 'asc' : 'desc',
+    }));
+  };
+
+  const handlePageChange = (page: number) => {
+    setFilters((prev) => ({ ...prev, page }));
+  };
+
+  const columns = [
+    {
+      key: 'email' as const,
+      label: 'Email',
+      sortable: true,
+    },
+    {
+      key: 'fullName' as const,
+      label: 'Name',
+      sortable: true,
+      render: (user: AdminUser) => user.fullName || '-',
+    },
+    {
+      key: 'createdAt' as const,
+      label: 'Created',
+      sortable: true,
+      render: (user: AdminUser) => formatDate(user.createdAt),
+    },
+    {
+      key: 'listingsCount' as const,
+      label: 'Listings',
+      sortable: false,
+    },
+    {
+      key: 'emailVerified' as const,
+      label: 'Email Verified',
+      sortable: false,
+      render: (user: AdminUser) => getVerifiedBadge(user.emailVerified),
+    },
+    {
+      key: 'lastSignInAt' as const,
+      label: 'Last Active',
+      sortable: true,
+      render: (user: AdminUser) => user.lastSignInAt ? formatDate(user.lastSignInAt) : 'Never',
+    },
+    {
+      key: 'status' as const,
+      label: 'Status',
+      sortable: false,
+      render: (user: AdminUser) => getStatusBadge(user.status),
+    },
+  ];
+
   return (
     <div>
       <div className="flex justify-between items-center mb-6">
@@ -728,18 +818,23 @@ function UsersTab() {
         />
       </div>
 
-      {/* Placeholder for filters and table */}
-      <div className="bg-white border border-[#EBEBEB] rounded-lg p-6">
-        <h3 className="text-sm font-semibold text-[#1A1A1A] mb-4">Users Table</h3>
-        <div className="text-[#666666] text-sm">
-          <p>Filters and table coming next...</p>
-          {data && (
-            <p className="mt-2">
-              Found {data.pagination.total} users (page {data.pagination.page} of {data.pagination.totalPages})
-            </p>
-          )}
-        </div>
-      </div>
+      {/* Filters */}
+      <UsersFilterPanel
+        filters={filters}
+        onFilterChange={setFilters}
+      />
+
+      {/* Users Table */}
+      <DataTable
+        data={data?.users ?? []}
+        isLoading={isLoading}
+        columns={columns}
+        sortBy={filters.sortBy}
+        sortDirection={filters.sortDirection}
+        onSort={handleSort}
+        pagination={data?.pagination}
+        onPageChange={handlePageChange}
+      />
     </div>
   );
 }
