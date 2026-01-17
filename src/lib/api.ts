@@ -2638,6 +2638,334 @@ export async function bulkDeleteReports(
 }
 
 // ============================================================================
+// SYSTEM HEALTH MONITORING
+// ============================================================================
+
+export type HealthStatus = 'excellent' | 'good' | 'fair' | 'poor' | 'critical';
+export type ServiceHealthStatus = 'healthy' | 'degraded' | 'down';
+
+export interface SystemHealthSummary {
+  timeRange: string;
+  healthScore: number;
+  healthStatus: HealthStatus;
+  services: {
+    api: number;
+    email: number;
+    payment: number;
+    push: number;
+    database: number;
+  };
+  activeUsers: number;
+  activeAlerts: number;
+  lastIncident: string | null;
+  uptime: number;
+  dataQuality?: 'sufficient' | 'insufficient';
+  sampleCount?: number;
+}
+
+export interface ServiceStatus {
+  name: string;
+  health: number;
+  status: ServiceHealthStatus;
+  latency?: number;
+  errorRate?: number;
+  successRate?: number;
+  lastError?: {
+    timestamp: string;
+    message: string;
+  };
+}
+
+export interface AlertConfig {
+  id: string;
+  name: string;
+  description: string;
+  metricType: string;
+  thresholdValue: number;
+  thresholdOperator: '>' | '<' | '>=' | '<=' | '=';
+  windowMinutes: number;
+  notificationChannels: { email: string[] };
+  cooldownMinutes: number;
+  enabled: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AlertHistoryItem {
+  id: string;
+  alertConfigId: string;
+  alertName: string;
+  triggeredAt: string;
+  resolvedAt: string | null;
+  metricValue: number;
+  thresholdValue: number;
+  context: Record<string, unknown>;
+  status: 'active' | 'resolved';
+}
+
+export interface AlertHistoryResponse {
+  history: AlertHistoryItem[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+}
+
+export interface AlertsResponse {
+  alerts: AlertConfig[];
+  total: number;
+}
+
+// Get system health summary
+export async function getSystemHealthSummary(
+  accessToken: string,
+  timeRange: string = '24h'
+): Promise<SystemHealthSummary> {
+  const params = new URLSearchParams();
+  params.set('time_range', timeRange);
+
+  const url = `${API_BASE_URL}/api/admin/analytics/system/summary?${params.toString()}`;
+
+  const res = await fetchWithRetry(url, {
+    headers: {
+      'Authorization': `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+  });
+
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.error || 'Failed to fetch system health summary');
+  }
+
+  return res.json();
+}
+
+// Get system services status (derived from health summary)
+export async function getSystemServices(
+  accessToken: string,
+  timeRange: string = '24h'
+): Promise<ServiceStatus[]> {
+  const summary = await getSystemHealthSummary(accessToken, timeRange);
+
+  const getStatus = (health: number): ServiceHealthStatus => {
+    if (health >= 75) return 'healthy';
+    if (health >= 50) return 'degraded';
+    return 'down';
+  };
+
+  return Object.entries(summary.services).map(([name, health]) => ({
+    name,
+    health,
+    status: getStatus(health),
+  }));
+}
+
+// Get all alert configurations
+export async function getSystemAlerts(accessToken: string): Promise<AlertConfig[]> {
+  const url = `${API_BASE_URL}/api/admin/analytics/system/alerts`;
+
+  const res = await fetchWithRetry(url, {
+    headers: {
+      'Authorization': `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+  });
+
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.error || 'Failed to fetch alerts');
+  }
+
+  const data: AlertsResponse = await res.json();
+  return data.alerts;
+}
+
+// Create a new alert configuration
+export async function createSystemAlert(
+  accessToken: string,
+  alert: Omit<AlertConfig, 'id' | 'createdAt' | 'updatedAt'>
+): Promise<AlertConfig> {
+  const url = `${API_BASE_URL}/api/admin/analytics/system/alerts`;
+
+  const res = await fetchWithRetry(url, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      name: alert.name,
+      description: alert.description,
+      metric_type: alert.metricType,
+      threshold_value: alert.thresholdValue,
+      threshold_operator: alert.thresholdOperator,
+      window_minutes: alert.windowMinutes,
+      cooldown_minutes: alert.cooldownMinutes,
+      enabled: alert.enabled,
+    }),
+  });
+
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.error || 'Failed to create alert');
+  }
+
+  const data = await res.json();
+  return transformAlertConfig(data.alert);
+}
+
+// Update an existing alert configuration
+export async function updateSystemAlert(
+  accessToken: string,
+  alertId: string,
+  updates: Partial<Omit<AlertConfig, 'id' | 'createdAt' | 'updatedAt'>>
+): Promise<AlertConfig> {
+  const url = `${API_BASE_URL}/api/admin/analytics/system/alerts/${alertId}`;
+
+  const body: Record<string, unknown> = {};
+  if (updates.name !== undefined) body.name = updates.name;
+  if (updates.description !== undefined) body.description = updates.description;
+  if (updates.metricType !== undefined) body.metric_type = updates.metricType;
+  if (updates.thresholdValue !== undefined) body.threshold_value = updates.thresholdValue;
+  if (updates.thresholdOperator !== undefined) body.threshold_operator = updates.thresholdOperator;
+  if (updates.windowMinutes !== undefined) body.window_minutes = updates.windowMinutes;
+  if (updates.cooldownMinutes !== undefined) body.cooldown_minutes = updates.cooldownMinutes;
+  if (updates.enabled !== undefined) body.enabled = updates.enabled;
+
+  const res = await fetchWithRetry(url, {
+    method: 'PATCH',
+    headers: {
+      'Authorization': `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.error || 'Failed to update alert');
+  }
+
+  const data = await res.json();
+  return transformAlertConfig(data.alert);
+}
+
+// Delete an alert configuration
+export async function deleteSystemAlert(
+  accessToken: string,
+  alertId: string
+): Promise<{ success: boolean }> {
+  const url = `${API_BASE_URL}/api/admin/analytics/system/alerts/${alertId}`;
+
+  const res = await fetchWithRetry(url, {
+    method: 'DELETE',
+    headers: {
+      'Authorization': `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+  });
+
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.error || 'Failed to delete alert');
+  }
+
+  return { success: true };
+}
+
+// Get alert history
+export async function getAlertHistory(
+  accessToken: string,
+  options: { page?: number; limit?: number; status?: 'active' | 'resolved' | 'all' } = {}
+): Promise<AlertHistoryResponse> {
+  const params = new URLSearchParams();
+  if (options.page) params.set('page', options.page.toString());
+  if (options.limit) params.set('limit', options.limit.toString());
+  if (options.status && options.status !== 'all') params.set('status', options.status);
+
+  const url = `${API_BASE_URL}/api/admin/analytics/system/alert-history?${params.toString()}`;
+
+  const res = await fetchWithRetry(url, {
+    headers: {
+      'Authorization': `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+  });
+
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.error || 'Failed to fetch alert history');
+  }
+
+  const data = await res.json();
+  return {
+    history: (data.history || []).map(transformAlertHistoryItem),
+    pagination: data.pagination,
+  };
+}
+
+// Acknowledge an alert
+export async function acknowledgeAlert(
+  accessToken: string,
+  alertHistoryId: string,
+  notes?: string
+): Promise<{ success: boolean; resolvedAt: string }> {
+  const url = `${API_BASE_URL}/api/admin/analytics/system/alert-history/${alertHistoryId}/acknowledge`;
+
+  const res = await fetchWithRetry(url, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ notes }),
+  });
+
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.error || 'Failed to acknowledge alert');
+  }
+
+  return res.json();
+}
+
+// Transform snake_case API response to camelCase
+function transformAlertConfig(api: Record<string, unknown>): AlertConfig {
+  return {
+    id: api.id as string,
+    name: api.name as string,
+    description: (api.description || '') as string,
+    metricType: api.metric_type as string,
+    thresholdValue: api.threshold_value as number,
+    thresholdOperator: api.threshold_operator as AlertConfig['thresholdOperator'],
+    windowMinutes: api.window_minutes as number,
+    notificationChannels: (api.notification_channels || { email: [] }) as { email: string[] },
+    cooldownMinutes: api.cooldown_minutes as number,
+    enabled: api.enabled as boolean,
+    createdAt: api.created_at as string,
+    updatedAt: api.updated_at as string,
+  };
+}
+
+function transformAlertHistoryItem(api: Record<string, unknown>): AlertHistoryItem {
+  const alertConfig = api.alert_configs as Record<string, unknown> | undefined;
+  return {
+    id: api.id as string,
+    alertConfigId: api.alert_config_id as string,
+    alertName: (alertConfig?.name || 'Unknown Alert') as string,
+    triggeredAt: api.triggered_at as string,
+    resolvedAt: api.resolved_at as string | null,
+    metricValue: api.metric_value as number,
+    thresholdValue: api.threshold_value as number,
+    context: (api.context || {}) as Record<string, unknown>,
+    status: api.resolved_at ? 'resolved' : 'active',
+  };
+}
+
+// ============================================================================
 // PERFORMANCE MONITORING
 // ============================================================================
 

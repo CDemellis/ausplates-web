@@ -34,6 +34,16 @@ import {
   PerformanceTimeseries,
   PerformanceEndpoints,
   PerformanceErrors,
+  getSystemHealthSummary,
+  getSystemAlerts,
+  createSystemAlert,
+  updateSystemAlert,
+  deleteSystemAlert,
+  getAlertHistory,
+  acknowledgeAlert,
+  SystemHealthSummary,
+  AlertConfig,
+  AlertHistoryItem,
 } from '@/lib/api';
 import { KPICard } from '@/components/admin/KPICard';
 import { FilterPanel } from '@/components/admin/FilterPanel';
@@ -46,6 +56,7 @@ import { EmailNotificationModal } from '@/components/admin/EmailNotificationModa
 import { ReportDetailsModal } from '@/components/admin/ReportDetailsModal';
 import { ResolutionNoteModal } from '@/components/admin/ResolutionNoteModal';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
+import { ServiceStatusCard, ServiceStatusCardSkeleton } from '@/components/admin/ServiceStatusCard';
 import { LineChart, Line, AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 type TabKey = 'overview' | 'users' | 'listings' | 'performance' | 'moderation' | 'system';
@@ -56,7 +67,7 @@ const TABS = [
   { key: 'listings' as TabKey, label: 'Listings', enabled: true },
   { key: 'performance' as TabKey, label: 'Performance', enabled: true },
   { key: 'moderation' as TabKey, label: 'Moderation', enabled: true },
-  { key: 'system' as TabKey, label: 'System Health', enabled: false },
+  { key: 'system' as TabKey, label: 'System Health', enabled: true },
 ];
 
 export default function AnalyticsPage() {
@@ -111,7 +122,7 @@ export default function AnalyticsPage() {
         {activeTab === 'listings' && <ListingsTab />}
         {activeTab === 'performance' && <PerformanceTab />}
         {activeTab === 'moderation' && <ModerationTab />}
-        {activeTab === 'system' && <PlaceholderTab name="System Health" />}
+        {activeTab === 'system' && <SystemHealthTab />}
       </div>
       </div>
     </ErrorBoundary>
@@ -1879,6 +1890,735 @@ function PerformanceTab() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// ============================================================================
+// SYSTEM HEALTH TAB
+// ============================================================================
+
+function SystemHealthTab() {
+  const { getAccessToken } = useAuth();
+  const [summary, setSummary] = useState<SystemHealthSummary | null>(null);
+  const [alerts, setAlerts] = useState<AlertConfig[]>([]);
+  const [alertHistory, setAlertHistory] = useState<AlertHistoryItem[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string>('');
+  const [timeRange, setTimeRange] = useState<string>('24h');
+  const [isAlertModalOpen, setIsAlertModalOpen] = useState(false);
+  const [editingAlert, setEditingAlert] = useState<AlertConfig | null>(null);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [alertToDelete, setAlertToDelete] = useState<AlertConfig | null>(null);
+  const [isPerformingAction, setIsPerformingAction] = useState(false);
+  const [activeSection, setActiveSection] = useState<'overview' | 'alerts' | 'history'>('overview');
+  const hasLoaded = useRef(false);
+  const refreshIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  const loadSystemHealth = useCallback(async () => {
+    try {
+      setError('');
+      const token = await getAccessToken();
+      if (!token) {
+        setError('Not authenticated');
+        return;
+      }
+
+      // Load all data in parallel
+      const [summaryData, alertsData, historyData] = await Promise.all([
+        getSystemHealthSummary(token, timeRange),
+        getSystemAlerts(token),
+        getAlertHistory(token, { limit: 50, status: 'all' }),
+      ]);
+
+      setSummary(summaryData);
+      setAlerts(alertsData);
+      setAlertHistory(historyData.history);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load system health data');
+      console.error('Failed to load system health:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [getAccessToken, timeRange]);
+
+  useEffect(() => {
+    if (hasLoaded.current) return;
+    hasLoaded.current = true;
+    loadSystemHealth();
+
+    // Refresh every 60 seconds
+    refreshIntervalRef.current = setInterval(loadSystemHealth, 60000);
+
+    return () => {
+      if (refreshIntervalRef.current) {
+        clearInterval(refreshIntervalRef.current);
+      }
+    };
+  }, [loadSystemHealth]);
+
+  // Reload when time range changes
+  useEffect(() => {
+    if (!hasLoaded.current) return;
+    loadSystemHealth();
+  }, [timeRange, loadSystemHealth]);
+
+  const getHealthStatusColor = (status: string): string => {
+    switch (status) {
+      case 'excellent': return 'text-[#22C55E]';
+      case 'good': return 'text-[#00843D]';
+      case 'fair': return 'text-[#FFCD00]';
+      case 'poor': return 'text-[#F59E0B]';
+      case 'critical': return 'text-[#EF4444]';
+      default: return 'text-[#666666]';
+    }
+  };
+
+  const getHealthStatusBg = (status: string): string => {
+    switch (status) {
+      case 'excellent': return 'bg-green-50 border-green-200';
+      case 'good': return 'bg-green-50 border-green-200';
+      case 'fair': return 'bg-yellow-50 border-yellow-200';
+      case 'poor': return 'bg-orange-50 border-orange-200';
+      case 'critical': return 'bg-red-50 border-red-200';
+      default: return 'bg-gray-50 border-gray-200';
+    }
+  };
+
+  const handleCreateAlert = async (alertData: Omit<AlertConfig, 'id' | 'createdAt' | 'updatedAt'>) => {
+    try {
+      setIsPerformingAction(true);
+      const token = await getAccessToken();
+      if (!token) {
+        setError('Not authenticated');
+        return;
+      }
+
+      await createSystemAlert(token, alertData);
+      setIsAlertModalOpen(false);
+      await loadSystemHealth();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to create alert');
+    } finally {
+      setIsPerformingAction(false);
+    }
+  };
+
+  const handleUpdateAlert = async (alertData: Partial<AlertConfig>) => {
+    if (!editingAlert) return;
+    try {
+      setIsPerformingAction(true);
+      const token = await getAccessToken();
+      if (!token) {
+        setError('Not authenticated');
+        return;
+      }
+
+      await updateSystemAlert(token, editingAlert.id, alertData);
+      setEditingAlert(null);
+      await loadSystemHealth();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to update alert');
+    } finally {
+      setIsPerformingAction(false);
+    }
+  };
+
+  const handleDeleteAlert = async () => {
+    if (!alertToDelete) return;
+    try {
+      setIsPerformingAction(true);
+      const token = await getAccessToken();
+      if (!token) {
+        setError('Not authenticated');
+        return;
+      }
+
+      await deleteSystemAlert(token, alertToDelete.id);
+      setIsDeleteModalOpen(false);
+      setAlertToDelete(null);
+      await loadSystemHealth();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete alert');
+    } finally {
+      setIsPerformingAction(false);
+    }
+  };
+
+  const handleAcknowledgeAlert = async (alertHistoryId: string) => {
+    try {
+      setIsPerformingAction(true);
+      const token = await getAccessToken();
+      if (!token) {
+        setError('Not authenticated');
+        return;
+      }
+
+      await acknowledgeAlert(token, alertHistoryId);
+      await loadSystemHealth();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to acknowledge alert');
+    } finally {
+      setIsPerformingAction(false);
+    }
+  };
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleString('en-AU', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  };
+
+  const activeAlerts = alertHistory.filter(h => h.status === 'active').length;
+
+  return (
+    <div>
+      <div className="flex justify-between items-center mb-6">
+        <h2 className="text-lg font-semibold text-[#1A1A1A]">System Health</h2>
+        <div className="flex gap-4 items-center">
+          <select
+            value={timeRange}
+            onChange={(e) => setTimeRange(e.target.value)}
+            className="px-3 py-2 border border-[#EBEBEB] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#00843D]"
+          >
+            <option value="1h">Last 1 hour</option>
+            <option value="6h">Last 6 hours</option>
+            <option value="24h">Last 24 hours</option>
+            <option value="7d">Last 7 days</option>
+            <option value="30d">Last 30 days</option>
+          </select>
+          <button
+            onClick={loadSystemHealth}
+            disabled={isLoading}
+            className="text-sm text-[#00843D] hover:text-[#006930] disabled:text-[#CCCCCC]"
+          >
+            {isLoading ? 'Refreshing...' : 'Refresh'}
+          </button>
+        </div>
+      </div>
+
+      {/* Error Message */}
+      {error && (
+        <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
+          {error}
+        </div>
+      )}
+
+      {/* Insufficient Data Warning */}
+      {summary?.dataQuality === 'insufficient' && (
+        <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg text-yellow-800 flex items-center gap-2">
+          <svg className="w-5 h-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+          </svg>
+          <span>
+            Limited data available ({summary?.sampleCount || 0} samples). Health scores may not be fully representative.
+          </span>
+        </div>
+      )}
+
+      {/* Section Tabs */}
+      <div className="flex gap-1 mb-6 bg-[#F8F8F8] rounded-lg p-1">
+        {(['overview', 'alerts', 'history'] as const).map((section) => (
+          <button
+            key={section}
+            onClick={() => setActiveSection(section)}
+            className={`
+              flex-1 px-4 py-2 text-sm font-medium rounded-md transition-colors
+              ${activeSection === section
+                ? 'bg-white text-[#1A1A1A] shadow-sm'
+                : 'text-[#666666] hover:text-[#1A1A1A]'
+              }
+            `}
+          >
+            {section === 'overview' && 'Overview'}
+            {section === 'alerts' && (
+              <span className="flex items-center justify-center gap-2">
+                Alert Rules
+                {alerts.length > 0 && (
+                  <span className="text-xs bg-[#EBEBEB] px-2 py-0.5 rounded-full">{alerts.length}</span>
+                )}
+              </span>
+            )}
+            {section === 'history' && (
+              <span className="flex items-center justify-center gap-2">
+                Alert History
+                {activeAlerts > 0 && (
+                  <span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full">{activeAlerts} active</span>
+                )}
+              </span>
+            )}
+          </button>
+        ))}
+      </div>
+
+      {/* Overview Section */}
+      {activeSection === 'overview' && (
+        <>
+          {/* KPI Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+            <div className={`rounded-xl border p-6 ${summary ? getHealthStatusBg(summary.healthStatus) : 'bg-gray-50 border-gray-200'}`}>
+              {isLoading ? (
+                <div className="animate-pulse">
+                  <div className="h-3 w-20 bg-gray-200 rounded mb-2" />
+                  <div className="h-8 w-16 bg-gray-200 rounded mb-1" />
+                  <div className="h-3 w-24 bg-gray-200 rounded" />
+                </div>
+              ) : (
+                <>
+                  <p className="text-sm text-[#666666] mb-1">Platform Health</p>
+                  <p className={`text-3xl font-semibold ${summary ? getHealthStatusColor(summary.healthStatus) : ''}`}>
+                    {summary?.healthScore ?? 0}%
+                  </p>
+                  <p className={`text-sm font-medium capitalize ${summary ? getHealthStatusColor(summary.healthStatus) : ''}`}>
+                    {summary?.healthStatus ?? 'Unknown'}
+                  </p>
+                </>
+              )}
+            </div>
+
+            <KPICard
+              label="Service Availability"
+              value={summary ? `${summary.uptime.toFixed(1)}%` : '0%'}
+              subtitle="Estimated uptime"
+              isLoading={isLoading}
+              error={error ? 'Error' : undefined}
+            />
+
+            <KPICard
+              label="Active Users"
+              value={summary?.activeUsers ?? 0}
+              subtitle="Last 5 minutes"
+              isLoading={isLoading}
+              error={error ? 'Error' : undefined}
+            />
+
+            <div className={`rounded-xl border p-6 ${activeAlerts > 0 ? 'bg-red-50 border-red-200' : 'bg-gray-50 border-gray-200'}`}>
+              {isLoading ? (
+                <div className="animate-pulse">
+                  <div className="h-3 w-20 bg-gray-200 rounded mb-2" />
+                  <div className="h-8 w-16 bg-gray-200 rounded mb-1" />
+                  <div className="h-3 w-24 bg-gray-200 rounded" />
+                </div>
+              ) : (
+                <>
+                  <p className="text-sm text-[#666666] mb-1">Active Alerts</p>
+                  <p className={`text-3xl font-semibold ${activeAlerts > 0 ? 'text-[#EF4444]' : 'text-[#22C55E]'}`}>
+                    {activeAlerts}
+                  </p>
+                  <p className="text-sm text-[#666666]">
+                    {summary?.lastIncident ? `Last: ${formatDate(summary.lastIncident)}` : 'No incidents'}
+                  </p>
+                </>
+              )}
+            </div>
+          </div>
+
+          {/* Service Status Grid */}
+          <div className="mb-8">
+            <h3 className="text-sm font-semibold text-[#1A1A1A] mb-4">Service Status</h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
+              {isLoading ? (
+                <>
+                  <ServiceStatusCardSkeleton />
+                  <ServiceStatusCardSkeleton />
+                  <ServiceStatusCardSkeleton />
+                  <ServiceStatusCardSkeleton />
+                  <ServiceStatusCardSkeleton />
+                </>
+              ) : summary ? (
+                Object.entries(summary.services).map(([name, health]) => (
+                  <ServiceStatusCard
+                    key={name}
+                    name={name}
+                    health={health}
+                    status={health >= 75 ? 'healthy' : health >= 50 ? 'degraded' : 'down'}
+                  />
+                ))
+              ) : null}
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Alerts Section */}
+      {activeSection === 'alerts' && (
+        <div className="bg-white border border-[#EBEBEB] rounded-lg p-6">
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="text-sm font-semibold text-[#1A1A1A]">Alert Configurations</h3>
+            <button
+              onClick={() => setIsAlertModalOpen(true)}
+              className="px-4 py-2 bg-[#00843D] text-white text-sm font-medium rounded-lg hover:bg-[#006930] transition-colors"
+            >
+              New Alert
+            </button>
+          </div>
+
+          {alerts.length === 0 ? (
+            <div className="text-center py-12 text-[#666666]">
+              <svg className="w-12 h-12 mx-auto mb-4 text-[#CCCCCC]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+              </svg>
+              <p>No alert rules configured</p>
+              <p className="text-sm mt-1">Create an alert to monitor system metrics</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-[#EBEBEB]">
+                <thead>
+                  <tr>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-[#666666] uppercase tracking-wider">Name</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-[#666666] uppercase tracking-wider">Metric</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-[#666666] uppercase tracking-wider">Threshold</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-[#666666] uppercase tracking-wider">Window</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-[#666666] uppercase tracking-wider">Status</th>
+                    <th className="px-4 py-3 text-right text-xs font-medium text-[#666666] uppercase tracking-wider">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[#EBEBEB]">
+                  {alerts.map((alert) => (
+                    <tr key={alert.id} className="hover:bg-[#F8F8F8]">
+                      <td className="px-4 py-3 text-sm text-[#1A1A1A] font-medium">{alert.name}</td>
+                      <td className="px-4 py-3 text-sm text-[#666666] capitalize">{alert.metricType.replace(/_/g, ' ')}</td>
+                      <td className="px-4 py-3 text-sm text-[#666666] font-mono">
+                        {alert.thresholdOperator} {alert.thresholdValue}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-[#666666]">{alert.windowMinutes} min</td>
+                      <td className="px-4 py-3">
+                        <span className={`px-2 py-1 rounded text-xs font-medium ${alert.enabled ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'}`}>
+                          {alert.enabled ? 'Enabled' : 'Disabled'}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <button
+                          onClick={() => setEditingAlert(alert)}
+                          className="text-sm text-[#00843D] hover:text-[#006930] mr-3"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          onClick={() => {
+                            setAlertToDelete(alert);
+                            setIsDeleteModalOpen(true);
+                          }}
+                          className="text-sm text-[#EF4444] hover:text-[#DC2626]"
+                        >
+                          Delete
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Alert History Section */}
+      {activeSection === 'history' && (
+        <div className="bg-white border border-[#EBEBEB] rounded-lg p-6">
+          <h3 className="text-sm font-semibold text-[#1A1A1A] mb-4">Alert History</h3>
+
+          {alertHistory.length === 0 ? (
+            <div className="text-center py-12 text-[#666666]">
+              <svg className="w-12 h-12 mx-auto mb-4 text-[#CCCCCC]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <p>No alert history</p>
+              <p className="text-sm mt-1">Alerts will appear here when triggered</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-[#EBEBEB]">
+                <thead>
+                  <tr>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-[#666666] uppercase tracking-wider">Alert Name</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-[#666666] uppercase tracking-wider">Triggered At</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-[#666666] uppercase tracking-wider">Value vs Threshold</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-[#666666] uppercase tracking-wider">Status</th>
+                    <th className="px-4 py-3 text-right text-xs font-medium text-[#666666] uppercase tracking-wider">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[#EBEBEB]">
+                  {alertHistory.map((item) => (
+                    <tr key={item.id} className="hover:bg-[#F8F8F8]">
+                      <td className="px-4 py-3 text-sm text-[#1A1A1A] font-medium">{item.alertName}</td>
+                      <td className="px-4 py-3 text-sm text-[#666666]">{formatDate(item.triggeredAt)}</td>
+                      <td className="px-4 py-3 text-sm font-mono text-[#666666]">
+                        <span className="text-[#EF4444]">{item.metricValue}</span> / {item.thresholdValue}
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className={`px-2 py-1 rounded text-xs font-medium ${item.status === 'active' ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
+                          {item.status === 'active' ? 'Active' : 'Resolved'}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        {item.status === 'active' && (
+                          <button
+                            onClick={() => handleAcknowledgeAlert(item.id)}
+                            disabled={isPerformingAction}
+                            className="text-sm text-[#00843D] hover:text-[#006930] disabled:text-[#CCCCCC]"
+                          >
+                            Acknowledge
+                          </button>
+                        )}
+                        {item.status === 'resolved' && item.resolvedAt && (
+                          <span className="text-sm text-[#999999]">
+                            {formatDate(item.resolvedAt)}
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Alert Config Modal */}
+      {(isAlertModalOpen || editingAlert) && (
+        <AlertConfigModal
+          isOpen={isAlertModalOpen || !!editingAlert}
+          alert={editingAlert}
+          onSave={editingAlert ? handleUpdateAlert : handleCreateAlert}
+          onCancel={() => {
+            setIsAlertModalOpen(false);
+            setEditingAlert(null);
+          }}
+          isLoading={isPerformingAction}
+        />
+      )}
+
+      {/* Delete Confirmation Modal */}
+      <ConfirmModal
+        isOpen={isDeleteModalOpen}
+        title="Delete Alert"
+        message={`Are you sure you want to delete the alert "${alertToDelete?.name}"? This action cannot be undone.`}
+        confirmText="Delete"
+        cancelText="Cancel"
+        confirmVariant="danger"
+        onConfirm={handleDeleteAlert}
+        onCancel={() => {
+          setIsDeleteModalOpen(false);
+          setAlertToDelete(null);
+        }}
+        isLoading={isPerformingAction}
+      />
+    </div>
+  );
+}
+
+// Alert Configuration Modal Component
+function AlertConfigModal({
+  isOpen,
+  alert,
+  onSave,
+  onCancel,
+  isLoading,
+}: {
+  isOpen: boolean;
+  alert: AlertConfig | null;
+  onSave: (data: Omit<AlertConfig, 'id' | 'createdAt' | 'updatedAt'>) => void;
+  onCancel: () => void;
+  isLoading: boolean;
+}) {
+  type ThresholdOperator = '>' | '<' | '>=' | '<=' | '=';
+
+  const [formData, setFormData] = useState<{
+    name: string;
+    description: string;
+    metricType: string;
+    thresholdValue: number;
+    thresholdOperator: ThresholdOperator;
+    windowMinutes: number;
+    cooldownMinutes: number;
+    enabled: boolean;
+  }>({
+    name: '',
+    description: '',
+    metricType: 'error_rate',
+    thresholdValue: 5,
+    thresholdOperator: '>',
+    windowMinutes: 5,
+    cooldownMinutes: 60,
+    enabled: true,
+  });
+
+  useEffect(() => {
+    if (alert) {
+      setFormData({
+        name: alert.name,
+        description: alert.description,
+        metricType: alert.metricType,
+        thresholdValue: alert.thresholdValue,
+        thresholdOperator: alert.thresholdOperator,
+        windowMinutes: alert.windowMinutes,
+        cooldownMinutes: alert.cooldownMinutes,
+        enabled: alert.enabled,
+      });
+    } else {
+      setFormData({
+        name: '',
+        description: '',
+        metricType: 'error_rate',
+        thresholdValue: 5,
+        thresholdOperator: '>',
+        windowMinutes: 5,
+        cooldownMinutes: 60,
+        enabled: true,
+      });
+    }
+  }, [alert]);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onSave({
+      ...formData,
+      notificationChannels: { email: [] },
+    });
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      <div className="fixed inset-0 bg-black/50" onClick={onCancel} />
+      <div className="relative bg-white rounded-lg shadow-xl max-w-md w-full mx-4 max-h-[90vh] overflow-y-auto">
+        <div className="p-6">
+          <h3 className="text-lg font-semibold text-[#1A1A1A] mb-4">
+            {alert ? 'Edit Alert' : 'Create Alert'}
+          </h3>
+          <form onSubmit={handleSubmit}>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-[#666666] mb-1">Name</label>
+                <input
+                  type="text"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  required
+                  className="w-full px-3 py-2 border border-[#EBEBEB] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#00843D]"
+                  placeholder="High Error Rate"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-[#666666] mb-1">Description</label>
+                <textarea
+                  value={formData.description}
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  rows={2}
+                  className="w-full px-3 py-2 border border-[#EBEBEB] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#00843D]"
+                  placeholder="Triggers when error rate exceeds threshold"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-[#666666] mb-1">Metric Type</label>
+                <select
+                  value={formData.metricType}
+                  onChange={(e) => setFormData({ ...formData, metricType: e.target.value })}
+                  className="w-full px-3 py-2 border border-[#EBEBEB] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#00843D]"
+                >
+                  <option value="error_rate">Error Rate (%)</option>
+                  <option value="response_time_p95">P95 Response Time (ms)</option>
+                  <option value="response_time_avg">Avg Response Time (ms)</option>
+                  <option value="health_score">Health Score</option>
+                  <option value="active_users">Active Users</option>
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-[#666666] mb-1">Operator</label>
+                  <select
+                    value={formData.thresholdOperator}
+                    onChange={(e) => setFormData({ ...formData, thresholdOperator: e.target.value as ThresholdOperator })}
+                    className="w-full px-3 py-2 border border-[#EBEBEB] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#00843D]"
+                  >
+                    <option value=">">&gt; Greater than</option>
+                    <option value="<">&lt; Less than</option>
+                    <option value=">=">&gt;= Greater or equal</option>
+                    <option value="<=">&lt;= Less or equal</option>
+                    <option value="=">=Equal</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-[#666666] mb-1">Threshold</label>
+                  <input
+                    type="number"
+                    value={formData.thresholdValue}
+                    onChange={(e) => setFormData({ ...formData, thresholdValue: parseFloat(e.target.value) })}
+                    required
+                    min={0}
+                    step="any"
+                    className="w-full px-3 py-2 border border-[#EBEBEB] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#00843D]"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-[#666666] mb-1">Window (minutes)</label>
+                  <input
+                    type="number"
+                    value={formData.windowMinutes}
+                    onChange={(e) => setFormData({ ...formData, windowMinutes: parseInt(e.target.value) })}
+                    required
+                    min={1}
+                    className="w-full px-3 py-2 border border-[#EBEBEB] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#00843D]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-[#666666] mb-1">Cooldown (minutes)</label>
+                  <input
+                    type="number"
+                    value={formData.cooldownMinutes}
+                    onChange={(e) => setFormData({ ...formData, cooldownMinutes: parseInt(e.target.value) })}
+                    required
+                    min={1}
+                    className="w-full px-3 py-2 border border-[#EBEBEB] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#00843D]"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="enabled"
+                  checked={formData.enabled}
+                  onChange={(e) => setFormData({ ...formData, enabled: e.target.checked })}
+                  className="w-4 h-4 text-[#00843D] border-[#EBEBEB] rounded focus:ring-[#00843D]"
+                />
+                <label htmlFor="enabled" className="text-sm text-[#666666]">Enabled</label>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3 mt-6">
+              <button
+                type="button"
+                onClick={onCancel}
+                className="px-4 py-2 text-sm font-medium text-[#666666] border border-[#EBEBEB] rounded-lg hover:bg-[#F8F8F8] transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={isLoading}
+                className="px-4 py-2 text-sm font-medium text-white bg-[#00843D] rounded-lg hover:bg-[#006930] disabled:bg-[#CCCCCC] transition-colors"
+              >
+                {isLoading ? 'Saving...' : alert ? 'Update' : 'Create'}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
     </div>
   );
 }
