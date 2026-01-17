@@ -2539,8 +2539,9 @@ export interface ReportDetail extends AdminReport {
     ownerName: string | null;
   } | null;
   resolutionNote: string | null;
-  resolvedByAdminId: string | null;
   dismissedReason: string | null;
+  resolvedByAdminId: string | null;
+  resolvedByAdminEmail: string | null;
 }
 
 export async function getAdminReports(token: string, filters: ReportsFilters): Promise<ReportsResponse> {
@@ -2589,7 +2590,9 @@ export async function getReportDetail(token: string, reportId: string): Promise<
 export async function bulkUpdateReportStatus(
   token: string,
   reportIds: string[],
-  action: 'resolve' | 'review' | 'dismiss'
+  action: 'resolve' | 'review' | 'dismiss',
+  resolutionNote?: string,
+  dismissedReason?: string
 ): Promise<{ success: boolean; updatedCount: number }> {
   const res = await fetch(`${API_BASE_URL}/admin/analytics/reports/bulk`, {
     method: 'PATCH',
@@ -2597,7 +2600,12 @@ export async function bulkUpdateReportStatus(
       'Content-Type': 'application/json',
       Authorization: `Bearer ${token}`,
     },
-    body: JSON.stringify({ reportIds, action }),
+    body: JSON.stringify({
+      reportIds,
+      action,
+      resolutionNote,
+      dismissedReason
+    }),
   });
 
   if (!res.ok) {
