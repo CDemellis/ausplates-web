@@ -157,6 +157,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 Promos
               </Link>
               <Link
+                href="/analytics"
+                className={`text-sm ${pathname.startsWith('/analytics') ? 'text-[#00843D] font-medium' : 'text-[#666666] hover:text-[#1A1A1A]'}`}
+              >
+                Analytics
+              </Link>
+              <Link
                 href="/2fa/settings"
                 className={`text-sm ${pathname.startsWith('/2fa/settings') ? 'text-[#00843D] font-medium' : 'text-[#666666] hover:text-[#1A1A1A]'}`}
               >

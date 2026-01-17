@@ -69,8 +69,13 @@ export default function AdminDashboardPage() {
       <div className="mb-8">
         <h2 className="text-lg font-semibold text-[#1A1A1A] mb-4">Quick Actions</h2>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <Link href="/promos" className="p-6 bg-white border border-[#EBEBEB] rounded-lg hover:border-[#00843D] transition-colors text-center">
+          <Link href="/analytics" className="p-6 bg-white border-2 border-[#00843D] rounded-lg hover:bg-[#F0F9F4] transition-colors text-center">
             <div className="text-3xl mb-3">📊</div>
+            <div className="font-medium text-[#1A1A1A]">Analytics Dashboard</div>
+            <div className="text-sm text-[#666666] mt-1">Platform metrics & insights</div>
+          </Link>
+          <Link href="/promos" className="p-6 bg-white border border-[#EBEBEB] rounded-lg hover:border-[#00843D] transition-colors text-center">
+            <div className="text-3xl mb-3">🎫</div>
             <div className="font-medium text-[#1A1A1A]">Promo Dashboard</div>
             <div className="text-sm text-[#666666] mt-1">View stats and manage codes</div>
           </Link>
