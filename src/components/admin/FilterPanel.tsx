@@ -38,7 +38,7 @@ const PLATE_TYPES = [
 ];
 
 export function FilterPanel({ filters, onFilterChange, isCollapsed = false, onToggleCollapse }: FilterPanelProps) {
-  const updateFilter = (key: keyof ListingsFilters, value: any) => {
+  const updateFilter = <K extends keyof ListingsFilters>(key: K, value: ListingsFilters[K]) => {
     onFilterChange({ ...filters, [key]: value, page: 1 }); // Reset to page 1 when filtering
   };
 

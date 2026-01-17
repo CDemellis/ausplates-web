@@ -27,7 +27,7 @@ const ACCOUNT_TYPES = [
 ];
 
 export function UsersFilterPanel({ filters, onFilterChange, isCollapsed = false, onToggleCollapse }: UsersFilterPanelProps) {
-  const updateFilter = (key: keyof UsersFilters, value: any) => {
+  const updateFilter = <K extends keyof UsersFilters>(key: K, value: UsersFilters[K]) => {
     onFilterChange({ ...filters, [key]: value, page: 1 }); // Reset to page 1 when filtering
   };
 

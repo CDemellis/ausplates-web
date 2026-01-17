@@ -369,7 +369,7 @@ function ListingsTab() {
   const handleSort = (column: string) => {
     setFilters((prev) => ({
       ...prev,
-      sortBy: column as any,
+      sortBy: column,
       sortDirection: prev.sortBy === column && prev.sortDirection === 'desc' ? 'asc' : 'desc',
     }));
   };

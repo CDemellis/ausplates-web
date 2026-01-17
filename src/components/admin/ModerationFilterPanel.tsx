@@ -8,7 +8,7 @@ interface ModerationFilterPanelProps {
 }
 
 export function ModerationFilterPanel({ filters, onFilterChange }: ModerationFilterPanelProps) {
-  const updateFilter = (key: keyof ReportsFilters, value: any) => {
+  const updateFilter = <K extends keyof ReportsFilters>(key: K, value: ReportsFilters[K]) => {
     onFilterChange({ ...filters, [key]: value, page: 1 }); // Reset to page 1 when filters change
   };
 

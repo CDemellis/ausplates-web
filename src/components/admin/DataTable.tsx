@@ -1,5 +1,5 @@
 // Generic type constraint: must have an 'id' property
-type DataWithId = { id: string; [key: string]: any };
+type DataWithId = { id: string; [key: string]: unknown };
 
 export interface Column<T extends DataWithId> {
   key: keyof T | 'actions';
