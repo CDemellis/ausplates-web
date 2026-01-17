@@ -2394,3 +2394,75 @@ export async function getAdminUsers(
   const data = await res.json();
   return data;
 }
+
+export async function bulkDeleteUsers(
+  accessToken: string,
+  userIds: string[]
+): Promise<{ success: boolean; deletedCount: number }> {
+  const url = `${API_BASE_URL}/api/admin/analytics/users/bulk`;
+
+  const res = await fetchWithRetry(url, {
+    method: 'DELETE',
+    headers: {
+      'Authorization': `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ userIds }),
+  });
+
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.error || 'Failed to delete users');
+  }
+
+  return res.json();
+}
+
+export async function bulkUpdateUserStatus(
+  accessToken: string,
+  userIds: string[],
+  action: 'ban' | 'unban'
+): Promise<{ success: boolean; updatedCount: number }> {
+  const url = `${API_BASE_URL}/api/admin/analytics/users/bulk`;
+
+  const res = await fetchWithRetry(url, {
+    method: 'PATCH',
+    headers: {
+      'Authorization': `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ userIds, action }),
+  });
+
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.error || 'Failed to update users');
+  }
+
+  return res.json();
+}
+
+export async function sendBulkNotification(
+  accessToken: string,
+  userIds: string[],
+  subject: string,
+  message: string
+): Promise<{ success: boolean; sentCount: number; message: string }> {
+  const url = `${API_BASE_URL}/api/admin/analytics/users/notify`;
+
+  const res = await fetchWithRetry(url, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ userIds, subject, message }),
+  });
+
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.error || 'Failed to send notifications');
+  }
+
+  return res.json();
+}
