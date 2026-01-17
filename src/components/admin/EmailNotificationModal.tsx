@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 
 interface EmailNotificationModalProps {
@@ -28,11 +28,11 @@ export function EmailNotificationModal({
   const isValid = subject.trim().length > 0 && message.trim().length > 0 && subject.length <= 200 && message.length <= 2000;
 
   // Reset form and call onCancel
-  const handleCancel = () => {
+  const handleCancel = useCallback(() => {
     setSubject('');
     setMessage('');
     onCancel();
-  };
+  }, [onCancel]);
 
   // Focus trap and escape key handler
   useEffect(() => {

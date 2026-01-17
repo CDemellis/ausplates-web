@@ -99,7 +99,7 @@ export function UsersFilterPanel({ filters, onFilterChange, isCollapsed = false,
           </label>
           <select
             value={filters.status || ''}
-            onChange={(e) => updateFilter('status', e.target.value || undefined)}
+            onChange={(e) => updateFilter('status', (e.target.value || undefined) as UsersFilters['status'])}
             className="w-full px-3 py-2 border border-[#EBEBEB] rounded-lg text-sm focus:outline-none focus:border-[#00843D]"
           >
             {USER_STATUSES.map((status) => (
@@ -138,7 +138,7 @@ export function UsersFilterPanel({ filters, onFilterChange, isCollapsed = false,
           </label>
           <select
             value={filters.accountType || ''}
-            onChange={(e) => updateFilter('accountType', e.target.value || undefined)}
+            onChange={(e) => updateFilter('accountType', (e.target.value || undefined) as UsersFilters['accountType'])}
             className="w-full px-3 py-2 border border-[#EBEBEB] rounded-lg text-sm focus:outline-none focus:border-[#00843D]"
           >
             {ACCOUNT_TYPES.map((type) => (

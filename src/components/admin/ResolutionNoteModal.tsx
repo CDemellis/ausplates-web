@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 
 interface ResolutionNoteModalProps {
@@ -29,10 +29,10 @@ export function ResolutionNoteModal({
   const isValid = note.trim().length > 0 && note.length <= maxChars;
 
   // Reset form and call onCancel
-  const handleCancel = () => {
+  const handleCancel = useCallback(() => {
     setNote('');
     onCancel();
-  };
+  }, [onCancel]);
 
   // Focus trap and escape key handler
   useEffect(() => {

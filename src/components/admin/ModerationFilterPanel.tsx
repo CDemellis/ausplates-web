@@ -59,7 +59,7 @@ export function ModerationFilterPanel({ filters, onFilterChange }: ModerationFil
           <select
             id="status-filter"
             value={filters.status || ''}
-            onChange={(e) => updateFilter('status', e.target.value || undefined)}
+            onChange={(e) => updateFilter('status', (e.target.value || undefined) as ReportsFilters['status'])}
             className="w-full px-3 py-2 border border-[#EBEBEB] rounded-lg text-sm focus:outline-none focus:border-[#00843D]"
           >
             <option value="">All Statuses</option>
@@ -78,7 +78,7 @@ export function ModerationFilterPanel({ filters, onFilterChange }: ModerationFil
           <select
             id="type-filter"
             value={filters.report_reason || ''}
-            onChange={(e) => updateFilter('report_reason', e.target.value || undefined)}
+            onChange={(e) => updateFilter('report_reason', (e.target.value || undefined) as ReportsFilters['report_reason'])}
             className="w-full px-3 py-2 border border-[#EBEBEB] rounded-lg text-sm focus:outline-none focus:border-[#00843D]"
           >
             <option value="">All Types</option>

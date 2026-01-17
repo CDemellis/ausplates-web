@@ -1,5 +1,6 @@
 // Generic type constraint: must have an 'id' property
-type DataWithId = { id: string; [key: string]: unknown };
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type DataWithId = { id: string; [key: string]: any };
 
 export interface Column<T extends DataWithId> {
   key: keyof T | 'actions';
