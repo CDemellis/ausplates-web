@@ -2,7 +2,13 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '@/lib/auth-context';
-import { getOverviewMetrics, OverviewMetrics } from '@/lib/api';
+import {
+  getOverviewMetrics,
+  OverviewMetrics,
+  getAdminListings,
+  ListingsResponse,
+  ListingsFilters,
+} from '@/lib/api';
 import { KPICard } from '@/components/admin/KPICard';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 
@@ -11,7 +17,7 @@ type TabKey = 'overview' | 'users' | 'listings' | 'performance' | 'moderation' |
 const TABS = [
   { key: 'overview' as TabKey, label: 'Overview', enabled: true },
   { key: 'users' as TabKey, label: 'Users', enabled: false },
-  { key: 'listings' as TabKey, label: 'Listings', enabled: false },
+  { key: 'listings' as TabKey, label: 'Listings', enabled: true },
   { key: 'performance' as TabKey, label: 'Performance', enabled: false },
   { key: 'moderation' as TabKey, label: 'Moderation', enabled: false },
   { key: 'system' as TabKey, label: 'System Health', enabled: false },
@@ -66,7 +72,7 @@ export default function AnalyticsPage() {
       <div className="mt-6">
         {activeTab === 'overview' && <OverviewTab />}
         {activeTab === 'users' && <PlaceholderTab name="Users" />}
-        {activeTab === 'listings' && <PlaceholderTab name="Listings" />}
+        {activeTab === 'listings' && <ListingsTab />}
         {activeTab === 'performance' && <PlaceholderTab name="Performance" />}
         {activeTab === 'moderation' && <PlaceholderTab name="Moderation" />}
         {activeTab === 'system' && <PlaceholderTab name="System Health" />}
@@ -246,6 +252,130 @@ function getHealthSubtitle(score: number): string {
   if (score >= 60) return 'Fair';
   if (score >= 40) return 'Needs Attention';
   return 'Critical';
+}
+
+function ListingsTab() {
+  const { getAccessToken } = useAuth();
+  const [data, setData] = useState<ListingsResponse | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string>('');
+  const [filters, setFilters] = useState<ListingsFilters>({
+    page: 1,
+    limit: 50,
+    sortBy: 'created_at',
+    sortDirection: 'desc',
+  });
+  const hasLoaded = useRef(false);
+
+  const loadListings = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      setError('');
+      const token = await getAccessToken();
+      if (!token) {
+        setError('Not authenticated');
+        return;
+      }
+
+      const response = await getAdminListings(token, filters);
+      setData(response);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load listings');
+      console.error('Failed to load listings:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [getAccessToken, filters]);
+
+  useEffect(() => {
+    if (hasLoaded.current) return;
+    hasLoaded.current = true;
+    loadListings();
+  }, [loadListings]);
+
+  // Reload when filters change
+  useEffect(() => {
+    if (!hasLoaded.current) return;
+    loadListings();
+  }, [filters, loadListings]);
+
+  const formatCurrency = (cents: number) => {
+    return `$${(cents / 100).toLocaleString('en-AU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  };
+
+  return (
+    <div>
+      <div className="flex justify-between items-center mb-6">
+        <h2 className="text-lg font-semibold text-[#1A1A1A]">Listings Management</h2>
+        <button
+          onClick={loadListings}
+          disabled={isLoading}
+          className="text-sm text-[#00843D] hover:text-[#006930] disabled:text-[#CCCCCC]"
+        >
+          {isLoading ? 'Refreshing...' : 'Refresh'}
+        </button>
+      </div>
+
+      {/* Error Message */}
+      {error && (
+        <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
+          {error}
+        </div>
+      )}
+
+      {/* Summary KPI Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        <KPICard
+          label="Total Listings"
+          value={data?.summary.total ?? 0}
+          subtitle={data ? `${data.summary.active} active` : undefined}
+          isLoading={isLoading}
+          error={error ? 'Error' : undefined}
+        />
+
+        <KPICard
+          label="Active Listings"
+          value={data?.summary.active ?? 0}
+          subtitle={data ? `Avg: ${formatCurrency(data.summary.avgPrice)}` : undefined}
+          isLoading={isLoading}
+          error={error ? 'Error' : undefined}
+        />
+
+        <KPICard
+          label="Pending Reports"
+          value={data?.summary.pendingReports ?? 0}
+          subtitle={
+            data?.summary.pendingReports && data.summary.pendingReports > 0
+              ? '⚠️ Needs attention'
+              : 'All clear'
+          }
+          isLoading={isLoading}
+          error={error ? 'Error' : undefined}
+        />
+
+        <KPICard
+          label="Boost Revenue"
+          value={data ? formatCurrency(data.summary.boostRevenue7d) : '$0.00'}
+          subtitle={data ? `30d: ${formatCurrency(data.summary.boostRevenue30d)}` : undefined}
+          isLoading={isLoading}
+          error={error ? 'Error' : undefined}
+        />
+      </div>
+
+      {/* Listings Table Placeholder */}
+      <div className="bg-white border border-[#EBEBEB] rounded-lg p-6">
+        <h3 className="text-sm font-semibold text-[#1A1A1A] mb-4">Listings Table</h3>
+        <div className="text-[#666666] text-sm">
+          <p>Filters, table, and bulk actions coming next...</p>
+          {data && (
+            <p className="mt-2">
+              Found {data.pagination.total} listings (page {data.pagination.page} of {data.pagination.totalPages})
+            </p>
+          )}
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function PlaceholderTab({ name }: { name: string }) {

@@ -2177,3 +2177,85 @@ export async function getOverviewMetrics(accessToken: string): Promise<OverviewM
   const data = await res.json();
   return data;
 }
+
+// Admin Listings
+export interface AdminListing {
+  id: string;
+  combination: string;
+  state: string;
+  plateType: string;
+  price: number;
+  status: string;
+  viewsCount: number;
+  ownerEmail: string;
+  ownerName: string;
+  createdAt: string;
+  pendingReports: number;
+}
+
+export interface ListingsSummary {
+  total: number;
+  active: number;
+  avgPrice: number;
+  pendingReports: number;
+  boostRevenue7d: number;
+  boostRevenue30d: number;
+}
+
+export interface ListingsFilters {
+  status?: string;
+  state?: string;
+  plateType?: string;
+  minPrice?: number;
+  maxPrice?: number;
+  search?: string;
+  page?: number;
+  limit?: number;
+  sortBy?: string;
+  sortDirection?: 'asc' | 'desc';
+}
+
+export interface ListingsResponse {
+  listings: AdminListing[];
+  summary: ListingsSummary;
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+}
+
+export async function getAdminListings(
+  accessToken: string,
+  filters?: ListingsFilters
+): Promise<ListingsResponse> {
+  const params = new URLSearchParams();
+  if (filters?.status) params.set('status', filters.status);
+  if (filters?.state) params.set('state', filters.state);
+  if (filters?.plateType) params.set('plate_type', filters.plateType);
+  if (filters?.minPrice !== undefined) params.set('min_price', filters.minPrice.toString());
+  if (filters?.maxPrice !== undefined) params.set('max_price', filters.maxPrice.toString());
+  if (filters?.search) params.set('search', filters.search);
+  if (filters?.page) params.set('page', filters.page.toString());
+  if (filters?.limit) params.set('limit', filters.limit.toString());
+  if (filters?.sortBy) params.set('sort_by', filters.sortBy);
+  if (filters?.sortDirection) params.set('sort_direction', filters.sortDirection);
+
+  const url = `${API_BASE_URL}/api/admin/analytics/listings${params.toString() ? '?' + params.toString() : ''}`;
+
+  const res = await fetchWithRetry(url, {
+    headers: {
+      'Authorization': `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+  });
+
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.error || 'Failed to fetch listings');
+  }
+
+  const data = await res.json();
+  return data;
+}
