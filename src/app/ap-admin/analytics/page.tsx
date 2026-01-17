@@ -22,6 +22,8 @@ import {
   ReportsResponse,
   ReportsFilters,
   AdminReport,
+  ReportDetail,
+  getReportDetail,
   bulkUpdateReportStatus,
   bulkDeleteReports,
 } from '@/lib/api';
@@ -33,6 +35,8 @@ import { DataTable } from '@/components/admin/DataTable';
 import { BulkActionBar } from '@/components/admin/BulkActionBar';
 import { ConfirmModal } from '@/components/admin/ConfirmModal';
 import { EmailNotificationModal } from '@/components/admin/EmailNotificationModal';
+import { ReportDetailsModal } from '@/components/admin/ReportDetailsModal';
+import { ResolutionNoteModal } from '@/components/admin/ResolutionNoteModal';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 
 type TabKey = 'overview' | 'users' | 'listings' | 'performance' | 'moderation' | 'system';
@@ -1087,6 +1091,13 @@ function ModerationTab() {
     sortBy: 'created_at',
     sortDirection: 'desc',
   });
+  const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [isResolveModalOpen, setIsResolveModalOpen] = useState(false);
+  const [isDismissModalOpen, setIsDismissModalOpen] = useState(false);
+  const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
+  const [selectedReport, setSelectedReport] = useState<ReportDetail | null>(null);
+  const [isPerformingAction, setIsPerformingAction] = useState(false);
   const hasLoaded = useRef(false);
 
   const loadReports = useCallback(async () => {
@@ -1166,6 +1177,169 @@ function ModerationTab() {
     setFilters((prev) => ({ ...prev, page }));
   };
 
+  const handleSelectRow = (id: string) => {
+    setSelectedRows((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(id)) {
+        newSet.delete(id);
+      } else {
+        newSet.add(id);
+      }
+      return newSet;
+    });
+  };
+
+  const handleSelectAll = (selectAll: boolean) => {
+    if (selectAll) {
+      setSelectedRows(new Set(data?.reports.map((r) => r.id) || []));
+    } else {
+      setSelectedRows(new Set());
+    }
+  };
+
+  const handleClearSelection = () => {
+    setSelectedRows(new Set());
+  };
+
+  const handleBulkResolve = async (note: string) => {
+    if (selectedRows.size === 0) return;
+
+    try {
+      setIsPerformingAction(true);
+      const token = await getAccessToken();
+      if (!token) {
+        setError('Not authenticated');
+        return;
+      }
+
+      await bulkUpdateReportStatus(token, Array.from(selectedRows), 'resolve');
+      setIsResolveModalOpen(false);
+      setSelectedRows(new Set());
+      await loadReports();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to resolve reports');
+      console.error('Failed to bulk resolve reports:', err);
+    } finally {
+      setIsPerformingAction(false);
+    }
+  };
+
+  const handleBulkDismiss = async (reason: string) => {
+    if (selectedRows.size === 0) return;
+
+    try {
+      setIsPerformingAction(true);
+      const token = await getAccessToken();
+      if (!token) {
+        setError('Not authenticated');
+        return;
+      }
+
+      await bulkUpdateReportStatus(token, Array.from(selectedRows), 'dismiss');
+      setIsDismissModalOpen(false);
+      setSelectedRows(new Set());
+      await loadReports();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to dismiss reports');
+      console.error('Failed to bulk dismiss reports:', err);
+    } finally {
+      setIsPerformingAction(false);
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedRows.size === 0) return;
+
+    try {
+      setIsPerformingAction(true);
+      const token = await getAccessToken();
+      if (!token) {
+        setError('Not authenticated');
+        return;
+      }
+
+      await bulkDeleteReports(token, Array.from(selectedRows));
+      setIsDeleteModalOpen(false);
+      setSelectedRows(new Set());
+      await loadReports();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete reports');
+      console.error('Failed to bulk delete reports:', err);
+    } finally {
+      setIsPerformingAction(false);
+    }
+  };
+
+  const handleExportCSV = () => {
+    if (!data || selectedRows.size === 0) return;
+
+    const selectedReports = data.reports.filter((r) => selectedRows.has(r.id));
+    const headers = ['Report ID', 'Type', 'Reporter Email', 'Reported Content', 'Content Type', 'Status', 'Created', 'Reviewed'];
+    const rows = selectedReports.map((r) => [
+      r.id.slice(0, 8),
+      getReasonLabel(r.reportReason),
+      r.reporterEmail,
+      r.reportedContentPreview,
+      r.reportedContentType,
+      r.status,
+      new Date(r.createdAt).toLocaleDateString('en-AU'),
+      r.reviewedAt ? new Date(r.reviewedAt).toLocaleDateString('en-AU') : 'Not reviewed',
+    ]);
+
+    const csv = [headers.join(','), ...rows.map((row) => row.map(field => `"${field}"`).join(','))].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `reports-${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleViewDetails = async (reportId: string) => {
+    try {
+      setIsPerformingAction(true);
+      const token = await getAccessToken();
+      if (!token) {
+        setError('Not authenticated');
+        return;
+      }
+
+      const report = await getReportDetail(token, reportId);
+      setSelectedReport(report);
+      setIsDetailsModalOpen(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load report details');
+      console.error('Failed to load report details:', err);
+    } finally {
+      setIsPerformingAction(false);
+    }
+  };
+
+  const handleQuickResolve = async () => {
+    if (!selectedReport) return;
+    await bulkUpdateReportStatus(
+      await getAccessToken(),
+      [selectedReport.id],
+      'resolve'
+    );
+    setIsDetailsModalOpen(false);
+    setSelectedReport(null);
+    await loadReports();
+  };
+
+  const handleQuickDismiss = async () => {
+    if (!selectedReport) return;
+    await bulkUpdateReportStatus(
+      await getAccessToken(),
+      [selectedReport.id],
+      'dismiss'
+    );
+    setIsDetailsModalOpen(false);
+    setSelectedReport(null);
+    await loadReports();
+  };
+
   const columns = [
     {
       key: 'id' as const,
@@ -1215,6 +1389,19 @@ function ModerationTab() {
       label: 'Created',
       sortable: true,
       render: (report: AdminReport) => formatDate(report.createdAt),
+    },
+    {
+      key: 'id' as const,
+      label: 'Actions',
+      sortable: false,
+      render: (report: AdminReport) => (
+        <button
+          onClick={() => handleViewDetails(report.id)}
+          className="text-sm text-[#00843D] hover:text-[#006930] font-medium"
+        >
+          View Details
+        </button>
+      ),
     },
   ];
 
@@ -1293,6 +1480,71 @@ function ModerationTab() {
         onSort={handleSort}
         pagination={data?.pagination}
         onPageChange={handlePageChange}
+        selectedRows={selectedRows}
+        onSelectRow={handleSelectRow}
+        onSelectAll={handleSelectAll}
+      />
+
+      {/* Bulk Action Bar */}
+      <BulkActionBar
+        selectedCount={selectedRows.size}
+        onChangeStatus={() => setIsResolveModalOpen(true)}
+        onExportCSV={handleExportCSV}
+        onDelete={() => setIsDeleteModalOpen(true)}
+        onClearSelection={handleClearSelection}
+        customActions={[
+          {
+            label: 'Dismiss',
+            onClick: () => setIsDismissModalOpen(true),
+            variant: 'secondary' as const,
+          },
+        ]}
+      />
+
+      {/* Report Details Modal */}
+      <ReportDetailsModal
+        isOpen={isDetailsModalOpen}
+        report={selectedReport}
+        onClose={() => {
+          setIsDetailsModalOpen(false);
+          setSelectedReport(null);
+        }}
+        onResolve={handleQuickResolve}
+        onDismiss={handleQuickDismiss}
+        isLoading={isPerformingAction}
+      />
+
+      {/* Resolution Note Modal */}
+      <ResolutionNoteModal
+        isOpen={isResolveModalOpen}
+        selectedCount={selectedRows.size}
+        action="resolve"
+        onConfirm={handleBulkResolve}
+        onCancel={() => setIsResolveModalOpen(false)}
+        isLoading={isPerformingAction}
+      />
+
+      {/* Dismissal Reason Modal */}
+      <ResolutionNoteModal
+        isOpen={isDismissModalOpen}
+        selectedCount={selectedRows.size}
+        action="dismiss"
+        onConfirm={handleBulkDismiss}
+        onCancel={() => setIsDismissModalOpen(false)}
+        isLoading={isPerformingAction}
+      />
+
+      {/* Delete Confirmation Modal */}
+      <ConfirmModal
+        isOpen={isDeleteModalOpen}
+        title="Delete Reports"
+        message={`Are you sure you want to delete ${selectedRows.size} ${selectedRows.size === 1 ? 'report' : 'reports'}? This action cannot be undone.`}
+        confirmText="Delete"
+        cancelText="Cancel"
+        confirmVariant="danger"
+        onConfirm={handleBulkDelete}
+        onCancel={() => setIsDeleteModalOpen(false)}
+        isLoading={isPerformingAction}
       />
     </div>
   );
