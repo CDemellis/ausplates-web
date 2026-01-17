@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '@/lib/auth-context';
 import { getOverviewMetrics, OverviewMetrics } from '@/lib/api';
 import { KPICard } from '@/components/admin/KPICard';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 
 type TabKey = 'overview' | 'users' | 'listings' | 'performance' | 'moderation' | 'system';
 
@@ -20,7 +21,8 @@ export default function AnalyticsPage() {
   const [activeTab, setActiveTab] = useState<TabKey>('overview');
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-8">
+    <ErrorBoundary>
+      <div className="max-w-7xl mx-auto px-4 py-8">
       {/* Page Header */}
       <div className="mb-8">
         <h1 className="text-2xl font-semibold text-[#1A1A1A]">Analytics Dashboard</h1>
@@ -69,7 +71,8 @@ export default function AnalyticsPage() {
         {activeTab === 'moderation' && <PlaceholderTab name="Moderation" />}
         {activeTab === 'system' && <PlaceholderTab name="System Health" />}
       </div>
-    </div>
+      </div>
+    </ErrorBoundary>
   );
 }
 
