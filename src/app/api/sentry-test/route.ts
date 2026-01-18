@@ -20,6 +20,19 @@ export async function GET() {
 }
 
 export async function POST() {
+  // Check if Sentry client is initialized
+  const client = Sentry.getClient();
+  const dsn = process.env.NEXT_PUBLIC_SENTRY_DSN;
+
+  // If no client, try to initialize directly
+  if (!client) {
+    Sentry.init({
+      dsn,
+      tracesSampleRate: 1,
+      debug: true,
+    });
+  }
+
   // Alternative: manually capture an error without throwing
   const testError = new Error('Manual Sentry test error from POST /api/sentry-test');
 
@@ -31,12 +44,14 @@ export async function POST() {
   });
 
   // Flush events before serverless function terminates
-  await Sentry.flush(2000);
+  await Sentry.flush(5000);
 
   return NextResponse.json({
     success: true,
     message: 'Test error sent to Sentry',
     eventId,
-    dsn: process.env.NEXT_PUBLIC_SENTRY_DSN ? 'configured' : 'missing',
+    clientInitialized: !!client,
+    clientAfterInit: !!Sentry.getClient(),
+    dsn: dsn ? `${dsn.substring(0, 20)}...` : 'missing',
   });
 }
