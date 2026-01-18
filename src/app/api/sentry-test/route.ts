@@ -23,15 +23,20 @@ export async function POST() {
   // Alternative: manually capture an error without throwing
   const testError = new Error('Manual Sentry test error from POST /api/sentry-test');
 
-  Sentry.captureException(testError, {
+  const eventId = Sentry.captureException(testError, {
     tags: {
       source: 'sentry-test-endpoint',
       type: 'manual-capture',
     },
   });
 
+  // Flush events before serverless function terminates
+  await Sentry.flush(2000);
+
   return NextResponse.json({
     success: true,
     message: 'Test error sent to Sentry',
+    eventId,
+    dsn: process.env.NEXT_PUBLIC_SENTRY_DSN ? 'configured' : 'missing',
   });
 }
