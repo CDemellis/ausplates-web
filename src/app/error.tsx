@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react';
 import Link from 'next/link';
-import { captureError } from '@/lib/sentry';
+import * as Sentry from '@sentry/nextjs';
 
 export default function Error({
   error,
@@ -18,7 +18,7 @@ export default function Error({
     }
 
     // Send to Sentry error tracking
-    captureError(error, {
+    Sentry.captureException(error, {
       tags: { source: 'NextErrorPage' },
       extra: {
         digest: error.digest,
