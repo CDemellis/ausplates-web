@@ -1,57 +1,30 @@
 // This endpoint is used to test that Sentry is working correctly.
-// It throws an error that should be captured by Sentry.
 // Access it at /api/sentry-test to trigger a test error.
 
-import * as Sentry from '@sentry/nextjs';
 import { NextResponse } from 'next/server';
+import { captureServerException } from '@/lib/sentry-server';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
-  // Log that we're about to throw a test error
-  Sentry.addBreadcrumb({
-    category: 'sentry-test',
-    message: 'About to throw a test error',
-    level: 'info',
-  });
-
-  // Throw a test error
+  // Throw a test error (will be caught by error boundary)
   throw new Error('This is a test error from /api/sentry-test');
 }
 
 export async function POST() {
-  // Check if Sentry client is initialized
-  const client = Sentry.getClient();
-  const dsn = process.env.NEXT_PUBLIC_SENTRY_DSN;
-
-  // If no client, try to initialize directly
-  if (!client) {
-    Sentry.init({
-      dsn,
-      tracesSampleRate: 1,
-      debug: true,
-    });
-  }
-
-  // Alternative: manually capture an error without throwing
+  // Manually capture an error without throwing
   const testError = new Error('Manual Sentry test error from POST /api/sentry-test');
 
-  const eventId = Sentry.captureException(testError, {
+  const eventId = await captureServerException(testError, {
     tags: {
       source: 'sentry-test-endpoint',
       type: 'manual-capture',
     },
   });
 
-  // Flush events before serverless function terminates
-  await Sentry.flush(5000);
-
   return NextResponse.json({
     success: true,
     message: 'Test error sent to Sentry',
     eventId,
-    clientInitialized: !!client,
-    clientAfterInit: !!Sentry.getClient(),
-    dsn: dsn ? `${dsn.substring(0, 20)}...` : 'missing',
   });
 }
