@@ -7,8 +7,17 @@ import { captureServerException } from '@/lib/sentry-server';
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
-  // Throw a test error (will be caught by error boundary)
-  throw new Error('This is a test error from /api/sentry-test');
+  // Capture and throw a test error
+  const error = new Error('Test error from GET /api/sentry-test');
+
+  await captureServerException(error, {
+    tags: { source: 'sentry-test-endpoint', method: 'GET' },
+  });
+
+  return NextResponse.json(
+    { error: 'Test error captured and sent to Sentry' },
+    { status: 500 }
+  );
 }
 
 export async function POST() {
